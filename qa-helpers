@@ -1,0 +1,306 @@
+#!/bin/sh
+#! -*- coding: utf-8 -*-
+
+red="\033[1;31m"
+green="\033[1;32m"
+yellow="\033[1;33m"
+white="\033[1;37m"
+nc="\033[0m"
+
+# reset everything we define here
+# so that we pick up any changes
+# when re-sourced
+unset -f create_tmp_settings
+unset -f remove_tmp_settings
+unset -f syncdb
+unset -f migrate
+unset -f default_tests
+unset -f pqt
+unset -f prt
+unset -f qt
+unset -f rt
+unset -f qa
+unset -f accept
+unset -f close
+unset -f silent
+unset -f simplekill
+unset -f stop_all_supervisors
+unset -f kill_all_chromes
+unset -f kill_all_firefoxes
+unset -f kill_test_browser
+unset -f start_acceptance_supervisor
+unset -f runserver
+unset -f acctests
+unalias clearpyc 2> /dev/null
+unalias rmo 2> /dev/null
+unalias ga 2> /dev/null
+unalias rat 2> /dev/null
+
+# clear all old .pyc files to ensure code run is up-to-date
+alias clearpyc='find . -name "*.pyc" -exec rm "{}" ";"'
+alias rmo="find . -name *.orig -exec rm '{}' ';'"
+alias ga='./manage.py generate_auctions_now'
+alias rat=acctests
+
+PSQL_BIN=`which psql`
+
+silent () {
+    ($@ 2>&1 > /dev/null) 2>&1 > /dev/null
+}
+simplekill () {
+    silent kill -9 `ps aux | egrep -i "$1" | egrep -v "(grep)" | awk '{ print $2 }'`
+}
+
+qahelp() {
+    # Simply prints out the list of available commands to use in the qa-helpers
+    echo
+    print_cmd "clearpyc" "Finds and deletes any *.pyc files in the project"
+    print_cmd "rmo" "Finds and deletes any *.orig files left from a merge"
+    print_cmd "ga" "Uses the generate_auctions_now management command to create auctions"
+    print_cmd "rat" "Alias for acctests"
+    print_cmd "silent" "Silently runs a command piping output to /dev/null"
+    print_cmd "simplekill" "Uses a simple egrep and kill -9 to kill a process with a given name"
+    print_cmd "qahelp" "Outputs a list of commands available for usage."
+    print_cmd "syncdb" "Uses django syncdb to a specific db, drop, create and sync with migration fake steps"
+    print_cmd "migrate" "Runs the django migrate command without importing initial data"
+    print_cmd "default_tests" "Lists all tests available in the app/ folder. Used with unit tests."
+    print_cmd "prt" "Runs the python -cProfile with the rt command."
+    print_cmd "rt" "Runs the django management test command to run all tests available in the project."
+    print_cmd "qa" "Open a branch for QA and ensure it's up to date with master"
+    print_cmd "accept" "Consider the current branch as passed QA (merge it into TARGET, without pushing)"
+    print_cmd "close" "Close a given branch (tag it, delete branch, push tag)"
+    print_cmd "stop_supervisor" "Stops the supervisord in your scripts folder"
+    print_cmd "start_supervisor" "Starts the supervisord in your scripts folder"
+    print_cmd "acctests" "Runs lettuce harvest after creating an acceptance database"
+    print_cmd "runserver" "Uses the django runserver command after starting up supervisor. (Run with --test to run with lettuce_settings)"
+    echo
+}
+
+print_cmd() {
+    printf "$yellow$1$white: $2 $nc"
+    echo
+}
+
+create_tmp_settings() {
+    # work around Django's crappy multi-db support
+    DB=$1
+    NAME_FIELD=$2
+    if [[ -z $NAME_FIELD ]]; then
+        NAME_FIELD=NAME
+    fi
+    echo -e "from test_settings import *\nDATABASES['default']['$NAME_FIELD'] = '$1'" > tmp_settings.py
+}
+
+remove_tmp_settings() {
+    # work around Django's crappy multi-db support
+    rm -f tmp_settings.py tmp_settings.pyc
+}
+
+syncdb() {
+    # sync a specific database, doing the drop, create, and sync steps
+    DB=$1
+    if [[ -z $DB ]]; then
+        DB=bidsite
+    fi
+    create_tmp_settings $DB
+    dropdb $DB
+    createdb $DB && ./manage.py syncdb --all --noinput --settings=tmp_settings && ./manage.py migrate --fake
+    remove_tmp_settings
+}
+
+migrate() {
+    # Migrate without initial data
+    ./manage.py migrate --no-initial-data "$@"
+}
+
+default_tests() {
+    # list all the default tests that should be run
+    # unclebob requires the format apps/appname/tests
+    for name in `find apps -maxdepth 1 -type d -not -name apps`; do
+        echo "$name/tests"
+    done;
+}
+
+prt() {
+    # run the tests using the standard Django testrunner
+    TESTS="$@"
+    if [[ -z $TESTS ]]; then
+        TESTS=`default_tests`
+    fi
+    clearpyc
+    python -m cProfile -o test.prof manage.py test --settings=test_settings $TESTS
+}
+
+rt() {
+    # run the tests using the standard Django testrunner
+    clearpyc
+    ./manage.py test --settings=test_settings "$@" 
+}
+
+qa() {
+    # open a branch for QA and ensure it's up to date with master
+    BRANCH=$1
+    if [[ -z $BRANCH ]]; then
+        echo "Must give a branch to QA"
+        return 1
+    fi
+    _qa_use_ctags=$USE_CTAGS
+    USE_CTAGS=false
+    checkout $BRANCH && update && push && bdiv
+    USE_CTAGS=$_qa_use_ctags
+    utags
+}
+
+accept() {
+    # consider the current branch as passed QA (merge it into TARGET, without pushing)
+    BRANCH=`git_branch`
+    TARGET=`iter_branch`
+    if [[ $BRANCH == 'master' ]]; then
+        echo "Cannot close master"
+        return 1
+    elif [[ $BRANCH == $TARGET ]]; then
+        TARGET="master"
+    fi
+    UNPUSHED=`git log --oneline --no-merges $BRANCH ^origin/$BRANCH | wc -l | sed 's,[ ]*,,g'`
+    if [[ $UNPUSHED != 0 ]]; then
+        echo "You have unpushed changes"
+        return 1
+    fi
+
+    _close_use_ctags=$USE_CTAGS
+    USE_CTAGS=false
+    update $TARGET
+    if [[ $? != 0 ]]; then
+        echo
+        echo "There are merge conflicts that you must"
+        echo "resolve before accepting this branch."
+        return $?
+    fi
+
+    echo -n "Confirm accepting branch $BRANCH into $TARGET? [Y/n] "
+    read confirm
+    if [[ "$confirm" =~ [Nn] ]]; then
+        USE_CTAGS=$_close_use_ctags
+        return
+    fi
+    checkout $TARGET && merge $BRANCH
+    USE_CTAGS=$_close_use_ctags
+    utags
+}
+
+close() {
+    # close a given branch (tag it, delete branch, push tag)
+    BRANCH=$1
+    if [[ -z $BRANCH ]]; then
+        echo "Must give a branch to close"
+        return 1
+    fi
+    MAX_TAG=`git tag -l '$BRANCH.*' | awk -F. '{ print $NF }' | sort -rn | head -n1`
+    if [[ -z $MAX_TAG ]]; then
+        MAX_TAG=0
+    fi
+    NEW_TAG=$BRANCH.$((MAX_TAG+1))
+    git tag $NEW_TAG && git branch -d $BRANCH && git push origin :$BRANCH && git push origin $NEW_TAG
+}
+
+kill_all_chromes() {
+    printf "Will now kill all Google Chrome processes... "
+    simplekill "chrome"
+    echo "OK"
+}
+
+kill_all_firefoxes() {
+    printf "Will now kill all Firefox processes... "
+    simplekill "firefox"
+    echo "OK"
+}
+
+kill_test_browser() {
+    browser=`python -c 'import settings ; print settings.SELENIUM_DRIVER'`
+    if [[ $browser == 'webdriver.chrome' ]]; then
+        kill_all_chromes
+    elif [[ $browser == 'webdriver.firefox' ]]; then
+        kill_all_firefoxes
+    else
+        echo "Unknown browser driver: $browser"
+        return 1
+    fi
+}
+
+start_supervisor () {
+    if [[ ! -f manage.py ]]; then
+        echo "You must run this command from the root bidsite project folder"
+        return 1
+    fi
+    stop_supervisor
+    printf "Starting supervisor... "
+    mkdir -p scripts/local/logs
+    silent supervisord -c scripts/local/supervisord.conf
+    echo "OK"
+}
+
+stop_supervisor() {
+    if [[ ! -f manage.py ]]; then
+        echo "You must run this command from the root bidsite project folder"
+        return 1
+    fi
+    printf "Will now stop all supervisors... "
+    for conffile in scripts/local/supervisord*.conf; do
+        while [ -z "$?" ]; do
+            silent supervisorctl -c $conffile shutdown
+        done
+    done
+    simplekill 'supervisor(d|ctl)'
+    simplekill celeryd
+    simplekill nginx
+    simplekill redis
+    simplekill 'python .*reporting.py'
+    simplekill node
+    echo "OK"
+}
+
+runserver () {
+    clearpyc
+    start_supervisor
+    if [ "$1" != "--test" ]; then
+        python manage.py runserver 7000 $@
+    else
+        args=`echo $@ | sed 's,--test,,g'`
+        python manage.py runserver 7000 $args --settings=lettuce_settings
+    fi
+    stop_supervisor
+    clearpyc
+}
+
+acctests () {
+    no_server=`echo $@ | grep -E '(^| )-S( |$)'`
+    args=`echo $@ | sed 's,[-][-]fast,,g'`;
+
+    if [ -z "$no_server" ]; then
+        args="$args --settings=lettuce_settings" # for django
+        export DJANGO_SETTINGS_MODULE=lettuce_settings # for reporting
+
+        DBNAME=bidsite_acceptance
+        $PSQL_BIN --list | egrep $DBNAME 2>&1 > /dev/null
+        has_db=$?
+
+        if [ "$has_db" = "1" ]; then
+            echo "it seems you don't have the database \"$DBNAME\" yet"
+        fi
+
+        if [ "$1" != "--fast" ] || [ "$has_db" = "1" ]; then
+            printf "preparing the acceptance database... "
+            silent syncdb $DBNAME
+            echo "ok"
+        fi
+
+        # running acceptance tests
+        start_supervisor
+    fi
+
+    python manage.py harvest $args
+
+    if [ -z "$no_server" ]; then
+        stop_supervisor
+    fi
+}
