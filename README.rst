@@ -16,9 +16,7 @@ the bidsite project.)
 List of Helpers in this Repo
 ============================
 
-git-helpers::
-
-qa-helpers::
+git-helpers, qa-helpers::
     These provide shortcuts and aliases that make working with git easier,
     enforce consistent branch naming and commit message standards, running
     tests easier, etc.
