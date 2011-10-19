@@ -17,6 +17,7 @@ List of Helpers in this Repo
 ============================
 
 git-helpers::
+
 qa-helpers::
     These provide shortcuts and aliases that make working with git easier,
     enforce consistent branch naming and commit message standards, running
@@ -61,8 +62,8 @@ reviewboard.user.js::
 
     Screenshots are available at:
 
-        Before: http://i.imgur.com/zFetc.png
-        After: http://i.imgur.com/Q4re4.png
+    * Before: http://i.imgur.com/zFetc.png
+    * After: http://i.imgur.com/Q4re4.png
 
     This should work in either Chrome or FireFox (if you have the GreaseMonkey
     extension installed).
