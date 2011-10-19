@@ -24,6 +24,7 @@ git-helpers, qa-helpers::
     To use these, you must source them from your .profile or .bashrc file:
 
         source ~/devhelpers/git-helpers
+
         source ~/devhelpers/qa-helpers
 
     It is likely that most, if not all, of qa-helpers might better belong
