@@ -271,7 +271,7 @@ def post_message_on_irc(message, channels=None):
     server = irc.server()
     print "connecting to irc.mydomedia.com"
     server.connect(
-        'irc.mydomedia.com', 6667,
+        'irc.nextowntech.com', 6667,
         'reviewboard',
         ircname='rb-%s' % os.getenv('USER', 'developer'),
     )
