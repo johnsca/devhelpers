@@ -21,6 +21,8 @@ AGILEZEN_KEY = '108dd82a8d1b40d99289ef6e9cfc2a6c'
 AGILEZEN_PROJECT_ID = '17041'
 AGILEZEN_URL = 'https://agilezen.com/api/v1/projects/%s/' % AGILEZEN_PROJECT_ID
 
+IRC_SERVER = 'irc.nextowntech.com'
+
 def post_az_comment(story_number, text):
     print 'Posting to AZ story %s... ' % story_number,
     request = urllib2.Request(AGILEZEN_URL + 'stories/%s/comments' % story_number,
@@ -269,9 +271,9 @@ def color(text, type):
 def post_message_on_irc(message, channels=None):
     irc = irclib.IRC()
     server = irc.server()
-    print "connecting to irc.mydomedia.com"
+    print "connecting to " + IRC_SERVER
     server.connect(
-        'irc.nextowntech.com', 6667,
+        IRC_SERVER, 6667,
         'reviewboard',
         ircname='rb-%s' % os.getenv('USER', 'developer'),
     )
