@@ -90,8 +90,9 @@ def main(argv):
         print "Nothing new to post."
         return
 
+    current_repository = re.search(r'\/(.+)\.git', repo.remotes.origin.url).group(1)
+    update_review = get_update_review(opts, repo.head.ref.name, current_repository)
 
-    update_review = get_update_review(opts, repo.head.ref.name)
     options = collect_options(repo, commits, update_review)
     if options:
         review_id = post_review(diff_against_branch, options)
@@ -163,26 +164,28 @@ def get_review(commit):
         else:
             raise e
 
-def get_update_review(opts, branch):
+def get_update_review(opts, branch, repository_name):
     if '-u' in opts:
         review_data = get_existing_review_data(review_id=opts['-u'])
     else:
-        review_data = get_existing_review_data(branch=branch)
+        review_data = get_existing_review_data(branch=branch, repository_name=repository_name)
 
     if not review_data:
         print color('New review', 'details-prompt')
     else:
         title = review_data['summary']
-        print '{0}{1} - {2} (link: {3})\n'.format(
+        print '{0}{1} - {2} (link: {3})\n{4}{5}\n'.format(
             color('Updating existing review #', 'details-prompt'),
             color(review_data['id'], 'review'),
             color(review_data['summary'], 'review'),
-            color("{0}/r/{1}/".format(REVIEW_BOARD_URL, review_data['id']), 'details-prompt')
+            color("{0}/r/{1}/".format(REVIEW_BOARD_URL, review_data['id']), 'details-prompt'),
+            color('on repository ', 'details-prompt'),
+            color(repository_name, 'review')
         )
 
     return review_data
 
-def get_existing_review_data(review_id=None, branch=None):
+def get_existing_review_data(review_id=None, branch=None, repository_name=None):
     if 'APPDATA' in os.environ:
         homepath = os.environ['APPDATA']
     elif 'HOME' in os.environ:
@@ -195,7 +198,10 @@ def get_existing_review_data(review_id=None, branch=None):
     if review_id != None:
         return rb.get_review_request(review_id)
     else:
-        results = filter(lambda r: r['branch'] == branch, rb.api_get('/api/review-requests')['review_requests'])
+        results = filter(
+            lambda r: r['branch'] == branch and r['links']['repository']['title'] == repository_name,
+            rb.api_get('/api/review-requests')['review_requests'])
+
         return results[0] if results else None
 
 def get_story_number(repo):
