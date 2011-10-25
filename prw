@@ -90,7 +90,7 @@ def main(argv):
         print "Nothing new to post."
         return
 
-    current_repository = re.search(r'\/(.+)\.git', repo.remotes.origin.url).group(1)
+    current_repository = re.search(r'\/([^/]+)\.git', repo.remotes.origin.url).group(1)
     update_review = get_update_review(opts, repo.head.ref.name, current_repository)
 
     options = collect_options(repo, commits, update_review)
