@@ -134,10 +134,7 @@ bdiff() {
     B=$2
     if [[ "$A" == "" ]]; then
         A=`git_branch`
-        B=`iter_branch`
-        if [[ $A == $B ]]; then
-            B=master
-        fi
+        B="master"
     elif [[ "$B" == "" ]]; then
         A=`git_branch`
         B=$1
@@ -166,10 +163,7 @@ bdiv() {
     B=$2
     if [[ "$A" == "" ]]; then
         A=`git_branch`
-        B=`iter_branch`
-        if [[ $A == $B ]]; then
-            B=master
-        fi
+        B="master"
     elif [[ "$B" == "" ]]; then
         A=`git_branch`
         B=$1
