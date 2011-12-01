@@ -65,7 +65,7 @@ COLORS = {
 }
 
 def main(argv):
-    opts, args = getopt(argv, 'u:df')
+    opts, args = getopt(argv, 'u:dfp:')
     opts = dict(opts)
 
     if '-f' in opts:
@@ -77,7 +77,7 @@ def main(argv):
     global REVIEW_BOARD_URL
     REVIEW_BOARD_URL = repo.config_reader().get('reviewboard', 'url')
 
-    diff_against_branch = 'master'
+    diff_against_branch = opts.get('-p', 'master')
     if not update_diff_against_branch(diff_against_branch, repo):
         return
 
