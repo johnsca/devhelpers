@@ -70,10 +70,11 @@ alias add='git add'
 alias merge='git merge'
 alias gdiff='git diff'
 
+DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 ci() {
-    STORY=$(git_branch | sed -Ee 's=^(i/[0-9]+/[^/]+|story/[^/]+)/([0-9]+)-.*=\2=')
-    if [[ -z $STORY ]]; then
-        echo "Unable to determine story number from branch"
+    STORY=$($DEVHELPERS_DIR/story-from-branch $(git_branch))
+    if !$?; then
         return 1
     fi
     if [[ $# == 0 ]]; then
