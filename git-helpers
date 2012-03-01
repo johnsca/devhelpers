@@ -402,9 +402,7 @@ update() {
     return $result
 }
 
-if [[ -e /usr/local/git/contrib/completion/git-completion.bash ]]; then
-    source /usr/local/git/contrib/completion/git-completion.bash
-
+if [[ `type -t __gitcomp` ]]; then
     _git_branches_both() {
         __gitcomp "$(branches)"
     }
