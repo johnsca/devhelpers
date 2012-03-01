@@ -53,7 +53,11 @@ git_branch_p() {
 }
 
 # List all branches, local and remote
-alias branches='git branch -a | sed -Ee "s:^\*? *::" | sed -Ee "s:^(remotes/)?origin/::g" | grep -v "HEAD -> origin/master" | sort | uniq'
+SED_EX=r
+if [[ `echo 'foo' | sed -Ee 's/foo/bar/' 2> /dev/null` ]]; then
+    SED_EX=E
+fi
+alias branches='git branch -a | sed -'$SED_EX'e "s:^\*? *::" | sed -'$SED_EX'e "s:^(remotes/)?origin/::g" | grep -v "HEAD -> origin/master" | sort | uniq'
 
 iter_branch() {
     INUM=`date +'%U'`
