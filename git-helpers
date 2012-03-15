@@ -75,7 +75,6 @@ alias merge='git merge'
 alias gdiff='git diff'
 
 DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export DEVHELPERSRC="$DEVHELPERS_DIR/.devhelpersrc"
 
 ci() {
     STORY=$($DEVHELPERS_DIR/story-from-branch $(git_branch))
