@@ -123,26 +123,32 @@ bdiff() {
     VERBOSE=""
     MERGES="--no-merges"
     OPTS=""
-    while [[ $# -gt 0 && $1 == -* ]]; do
-        if [[ "$1" == "--show-merges" ]]; then
-            MERGES=""
-        elif [[ "$1" == "-v" || "$1" == "--verbose" ]]; then
-            VERBOSE="true"
-        elif [[ "$1" == "-vv" || "$1" == "--very-verbose" ]]; then
-            VERBOSE="very"
-        else
-            OPTS="$OPTS $1"
-        fi
+    unset A
+    unset B
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -m|--show-merges) MERGES="";;
+            -v|--verbose) VERBOSE="true";;
+            -vv|--very-verbose) VERBOSE="very";;
+            -*) OPTS="$OPTS $1";;
+            *)
+                if [[ -z $A ]]; then
+                    A=$1
+                elif [[ -z $B ]]; then
+                    B=$1
+                else
+                    echo "Too many paramaters: $1"
+                    return
+                fi;;
+        esac
         shift
     done
-    A=$1
-    B=$2
-    if [[ "$A" == "" ]]; then
+    if [[ -z $A ]]; then
         A=`git_branch`
         B="master"
-    elif [[ "$B" == "" ]]; then
+    elif [[ -z $B ]]; then
+        B=$A
         A=`git_branch`
-        B=$1
     fi
     if [[ "$VERBOSE" == "true" ]]; then
         git log $MERGES --stat --date=short $OPTS $* $A ^$B
