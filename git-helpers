@@ -75,30 +75,30 @@ alias merge='git merge'
 alias gdiff='git diff'
 
 DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DHP=$DEVHELPERS_DIR/helpers.py
 
 ci() {
-    STORY=$($DEVHELPERS_DIR/story-from-branch $(git_branch))
+    STORY=$($DHP story_from_branch $(git_branch))
     if [[ $? -ne 0 ]]; then
         return 1
     fi
+    git_opts=$($DHP git_opts)
     if [[ $# == 0 ]]; then
-        git commit -aem "S#$STORY - $*"
-    else
-        git commit -am "S#$STORY - $*"
+        git_opts="$git_opts -e"
     fi
+    git commit -am "$($DHP format_commit_message $STORY "$*")" $($DHP git_opts)
 }
 
 cm() {
-    STORY=$($DEVHELPERS_DIR/story-from-branch $(git_branch))
-    if [[ -z $STORY ]]; then
-        echo "Unable to determine story number from branch"
+    STORY=$($DHP story_from_branch $(git_branch))
+    if [[ $? -ne 0 ]]; then
         return 1
     fi
+    git_opts=$($DHP git_opts)
     if [[ $# == 0 ]]; then
-        git commit -em "S#$STORY - $*"
-    else
-        git commit -m "S#$STORY - $*"
+        git_opts="$git_opts -e"
     fi
+    git commit -m "$($DHP format_commit_message $STORY "$*")" $($DHP git_opts)
 }
 
 # Show what will be pushed from the current branch
