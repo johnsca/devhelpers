@@ -284,6 +284,11 @@ checkout() {
         return 1
     fi
 
+    if [[ "$new" == ".." ]]; then
+        git checkout @{-1}
+        return
+    fi
+
     if [[ -e $new && -n $file ]]; then
         echo -n "Confirm reset file? [y/N] "
         read confirm
