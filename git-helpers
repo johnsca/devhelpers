@@ -5,7 +5,6 @@
 # when re-sourced
 unset -f git_branch
 unset -f git_branch_p
-unset -f iter_branch
 unset -f push
 unset -f ci
 unset -f cm
@@ -58,11 +57,6 @@ if [[ `echo 'foo' | sed -Ee 's/foo/bar/' 2> /dev/null` ]]; then
     SED_EX=E
 fi
 alias branches='git branch -a | sed -'$SED_EX'e "s:^\*? *::" | sed -'$SED_EX'e "s:^(remotes/)?origin/::g" | grep -v "HEAD -> origin/master" | sort | uniq'
-
-iter_branch() {
-    INUM=`date +'%U'`
-    branches | egrep "^iteration/$INUM-"
-}
 
 # Only push current branch
 push() {
@@ -117,7 +111,7 @@ show-pull() {
 #
 # So, `bdiff HEAD master` shows what's in current HEAD that's not in master
 #
-# With no arguments, defaults to bdiff HEAD master
+# With no arguments, defaults to bdiff HEAD BASE_BRANCH
 # With one argument, defaults to bdiff HEAD $1
 bdiff() {
     VERBOSE=""
@@ -145,7 +139,7 @@ bdiff() {
     done
     if [[ -z $A ]]; then
         A=`git_branch`
-        B="master"
+        B=`$DHP base_branch`
     elif [[ -z $B ]]; then
         B=$A
         A=`git_branch`
@@ -174,7 +168,7 @@ bdiv() {
     B=$2
     if [[ "$A" == "" ]]; then
         A=`git_branch`
-        B="master"
+        B=`$DHP base_branch`
     elif [[ "$B" == "" ]]; then
         A=`git_branch`
         B=$1
@@ -254,7 +248,7 @@ checkout() {
             (e.g., master, HEAD, branch, tag) (defaults to master)
 "
     new=
-    old='master'
+    old=$($DHP base_branch)
     cur=$(git_branch)
     file=
 
@@ -393,7 +387,7 @@ update() {
     UPDATE_FROM=$1
     MERGE_FROM=$1
     if [[ -z $UPDATE_FROM ]]; then
-        UPDATE_FROM='master'
+        UPDATE_FROM=$($DHP base_branch)
         MERGE_FROM="origin/$UPDATE_FROM"
     fi
     git diff --quiet HEAD &> /dev/null

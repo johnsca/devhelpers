@@ -5,6 +5,7 @@ import imp
 class Config(object):
     BRANCH_PATTERN = r'^\w{2,3}/(\d+)'
     COMMIT_PATTERN = '[#{story_num}] {message}'
+    BASE_BRANCH = 'master'
 
     def __init__(self):
         self.load_rcfile(self.find_rcfile())

@@ -5,7 +5,7 @@ import re
 
 from config import Config
 
-COMMANDS = ['help', 'story_from_branch', 'format_commit_message', 'git_opts']
+COMMANDS = ['help', 'story_from_branch', 'format_commit_message', 'git_opts', 'base_branch']
 
 config = Config()
 
