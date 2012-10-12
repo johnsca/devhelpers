@@ -5,7 +5,6 @@
 # when re-sourced
 unset -f git_branch
 unset -f git_branch_p
-unset -f push
 unset -f ci
 unset -f cm
 unset -f show-push
@@ -22,11 +21,13 @@ unset -f update
 unset -f story
 unset -f _git_branches_both
 unalias branches 2> /dev/null
+unalias push 2> /dev/null
 unalias pull 2> /dev/null
 unalias add 2> /dev/null
 unalias merge 2> /dev/null
 unalias gdiff 2> /dev/null
 unalias st 2> /dev/null
+unalias unpushed 2> /dev/null
 
 USE_CTAGS="true"
 TAB_COMPLETE_REMOTE_BRANCHES="true"
@@ -56,17 +57,15 @@ SED_EX=r
 if [[ `echo 'foo' | sed -Ee 's/foo/bar/' 2> /dev/null` ]]; then
     SED_EX=E
 fi
-alias branches='git branch -a | sed -'$SED_EX'e "s:^\*? *::" | sed -'$SED_EX'e "s:^(remotes/)?origin/::g" | grep -v "HEAD -> origin/master" | sort | uniq'
+alias branches='git branch -a | sed -'$SED_EX'e "s:^\*? *::" | sed -'$SED_EX'e "s:^(remotes/[^/]+)?/::g" | grep -v "HEAD -> origin/master" | sort | uniq'
 
-# Only push current branch
-push() {
-        git push origin $(git_branch)
-}
-
+alias push='git push'
 alias pull='git pull'
 alias add='git add'
 alias merge='git merge'
 alias gdiff='git diff'
+#alias unpushed='git branch -vv | grep ahead'
+alias unpushed='git log --branches --not --remotes --simplify-by-decoration --decorate --oneline'
 
 DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DHP=$DEVHELPERS_DIR/helpers.py
@@ -241,7 +240,7 @@ shortlog() {
 # tracking, or the syntax for creating a new branch from any other
 # ref, remote or local.
 checkout() {
-    usage="Usage: checkout [-f] [-r] WHAT [FROM]
+    usage="Usage: checkout [-f] [-o ORIGIN] WHAT [FROM]
 
       WHAT  Ref to check out, or branch name to create
       FROM  If creating a new branch, what ref to create it from
@@ -251,6 +250,7 @@ checkout() {
     old=$($DHP base_branch)
     cur=$(git_branch)
     file=
+    remote_origin=
 
     if [[ -z $cur ]]; then
         echo "Not in a git repository"
@@ -261,6 +261,7 @@ checkout() {
         case $1 in
             -h) echo "$usage"; return;;
             -f) file=true;;
+            -o) shift; remote_origin=$1;;
             *)
                 if [[ -z $new ]]; then
                     new=$1
@@ -293,7 +294,19 @@ checkout() {
     fi
 
     exists_locally=$(git rev-parse --verify -q $new)
-    exists_remotely=$(git rev-parse --verify -q origin/$new)
+    if [[ -z "$remote_origin" ]]; then
+        exists_remotely=$(git rev-parse --symbolic --remotes=*/$new | sed -e 's:^refs/remotes/\([^/]*\).*:\1:')
+        if [[ -z "$exists_remotely" ]]; then
+            remote_origin=$(git remote | grep origin | head -1)
+            if [[ -z "$remote_origin" ]]; then
+                remote_origin=$(git remote | head -1)
+            fi
+        else
+            remote_origin="$exists_remotely"
+        fi
+    else
+        exists_remotely=$(git rev-parse --symbolic --remotes=$remote_origin/$new | sed -e 's:^refs/remotes/\([^/]*\).*:\1:')
+    fi
 
     if [[ -n $exists_locally ]]; then
         if [[ "$new" != "$cur" ]]; then
@@ -303,7 +316,7 @@ checkout() {
             fi
         fi
     elif [[ -n $exists_remotely ]]; then
-        git checkout -b $new origin/$new
+        git checkout -b $new $remote_origin/$new
         if [ $? -gt 0 ]; then
             return $?
         fi
@@ -322,7 +335,7 @@ checkout() {
     fi
 
     if [[ -z `git config branch.$new.remote` ]]; then
-        git config branch.$new.remote origin
+        git config branch.$new.remote $remote_origin
         if [ $? -gt 0 ]; then
             return $?
         fi
@@ -332,7 +345,6 @@ checkout() {
         if [ $? -gt 0 ]; then
             return $?
         fi
-        echo "Branch set up to track remote"
     fi
     utags
 }
