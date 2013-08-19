@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Allow multiple scripts for a git single hook.
+
+# Usage:
+#   cd proj/.git/hooks/
+#   mkdir {hook-name}.d/
+#   mv {hook-name} {hook-name}.d/
+#   ln -s /path/to/git-hookd {hook-name}
+
+HOOK=${0##*/}
+
+full_stdin=""
+while read line; do
+    full_stdin="$full_stdin$line\n"
+done
+
+for script in $HOOK.d/*; do
+    if [ -x $script ]; then
+        echo -en $full_stdin | $script "$@"
+    fi
+done
