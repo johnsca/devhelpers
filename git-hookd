@@ -8,7 +8,7 @@
 #   mv {hook-name} {hook-name}.d/
 #   ln -s /path/to/git-hookd {hook-name}
 
-HOOK=${0##*/}
+HOOK=$0
 
 full_stdin=""
 while read line; do
