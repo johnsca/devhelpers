@@ -9,14 +9,10 @@
 #   ln -s /path/to/git-hookd {hook-name}
 
 HOOK=$0
-
-full_stdin=""
-while read line; do
-    full_stdin="$full_stdin$line\n"
-done
+stdin=$(cat)
 
 for script in $HOOK.d/*; do
     if [ -x $script ]; then
-        echo -en $full_stdin | $script "$@"
+        echo "$stdin" | $script "$@"
     fi
 done
