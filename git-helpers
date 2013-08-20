@@ -20,6 +20,7 @@ unset -f utags
 unset -f update
 unset -f story
 unset -f _git_branches_both
+unset -f copy_all_branches
 unalias branches 2> /dev/null
 unalias push 2> /dev/null
 unalias pull 2> /dev/null
@@ -522,4 +523,11 @@ story () {
         done;
         return
     fi;
+}
+
+# Copy all branches from one remote to another.
+# e.g.: copy_all_branches origin sb
+# pulls all branches from origin and pushes them to sb
+copy_all_branches() {
+    git push $2 +refs/remotes/$1/*:refs/heads/*
 }
