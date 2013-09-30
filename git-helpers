@@ -209,7 +209,7 @@ glog() {
         fi
         shift
     done
-    git --no-pager log $MERGES --pretty=format:"%h : %ad : %an : %s $TAGS" --date=short $OPTS "$@" | perl -ne 'BEGIN { $max = 0; } split /:/, $_, 4; push @lines, [@_[0..3]]; $max = length($_[2]) if length($_[2]) > $max; END { printf "\e[0;33m%s\e[0m:%s:\e[1;34m%-${max}s\e[0m:%s", @$_ for @lines }' | less -RXF
+    git --no-pager log $MERGES --pretty=format:"%h : %ad : %an : %s $TAGS" --date=short $OPTS "$@" | perl -ne 'BEGIN { $max = 0; } @_ = split /:/, $_, 4; push @lines, [@_[0..3]]; $max = length($_[2]) if length($_[2]) > $max; END { printf "\e[0;33m%s\e[0m:%s:\e[1;34m%-${max}s\e[0m:%s", @$_ for @lines }' | less -RXF
 }
 
 # Show the full changelog, marked by release tags, starting with HEAD
