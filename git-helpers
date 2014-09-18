@@ -35,7 +35,7 @@ TAB_COMPLETE_REMOTE_BRANCHES="true"
 
 # Example prompt which shows current branch / commit:
 #
-#export PS1='\[\033]0;\u@\h:\w\007\][\u@\h \[\e[1;34m\]\W\[\e[0m\]$(git_branch_p)]\$ '
+#export PS1='\[\033]0;\u@\h:\w\007\][\[\e[1;32m\]\u@\h\[\e[0m\] \[\e[1;34m\]\W\[\e[0m\]\[$(git_color)\]$(git_branch_p)\[\e[0m\]]\$ '
 
 # Get current branch name or commit
 git_branch() {
@@ -530,4 +530,20 @@ story () {
 # pulls all branches from origin and pushes them to sb
 copy_all_branches() {
     git push $2 +refs/remotes/$1/*:refs/heads/*
+}
+
+# Output a color escape sequence based on the status of the current branch
+function git_color {
+    local git_status="$(git status 2> /dev/null)"
+    local red='\e[1;31m'
+    local green='\e[1;32m'
+    local yellow='\e[1;33m'
+
+    if [[ ! $git_status =~ "working directory clean" ]]; then
+        echo -e $red
+    elif [[ $git_status =~ "Your branch is ahead of" ]]; then
+        echo -e $yellow
+    elif [[ $git_status =~ "nothing to commit" ]]; then
+        echo -e $green
+    fi
 }
