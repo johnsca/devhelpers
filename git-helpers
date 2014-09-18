@@ -21,6 +21,7 @@ unset -f update
 unset -f story
 unset -f _git_branches_both
 unset -f copy_all_branches
+unset -f git_color
 unalias branches 2> /dev/null
 unalias push 2> /dev/null
 unalias pull 2> /dev/null
