@@ -1,0 +1,15 @@
+#!/bin/bash
+
+alias colorize_bzr="sed -e 's/\( *\)\([^ ]*\) \(.*\) \(....-..-..\)/\1[33m\2[0m [1;34m\3[0m [35m\4[0m/'"
+
+function bl() {
+    bzr log --line -l10 "$@" | colorize_bzr
+}
+
+function bll() {
+    bzr log --line -l10 -n0 "$@" | colorize_bzr
+}
+
+function bm() {
+    bzr missing --line "$@" | colorize_bzr
+}

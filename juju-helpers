@@ -1,0 +1,40 @@
+#!/bin/bash
+
+alias jp='juju pprint -a'
+alias jpp='watch juju pprint -a'
+alias dhx='juju dhx'
+alias jl='juju debug-log'
+alias jrun='juju run'
+alias jssh='juju ssh'
+alias jrs='juju remove-service'
+
+function jd() {
+    charm="$1"
+    shift
+    if [[ -z "$charm" ]]; then
+        charm=$(grep name: metadata.yaml | awk '{print $2}')
+        if [[ "$(pwd)" == */precise/* ]]; then
+            charm="local:precise/$charm"
+        elif [[ "$(pwd)" == */trusty/* ]]; then
+            charm="local:trusty/$charm"
+        else
+            rm -f $JUJU_REPOSITORY/trusty/$charm
+            ln -s "$(pwd)" $JUJU_REPOSITORY/trusty/$charm
+            charm="local:trusty/$charm"
+        fi
+    fi
+    juju deploy "$charm" "$@"
+}
+
+function js() {
+    juju switch "$@"
+    ~/bin/juju-machine-count > ~/.juju/.machine-count
+}
+
+function jdest() {
+    jenv=${1-$(juju switch)}
+    juju destroy-environment -y $jenv
+    ~/bin/juju-machine-count > ~/.juju/.machine-count
+}
+
+alias juju-secret='grep admin-secret ~/.juju/environments/`juju switch`.jenv | sed -e "s/  admin-secret: //"'
