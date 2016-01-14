@@ -1,29 +1,45 @@
 #!/bin/bash
 
-alias jp='juju pprint -a'
-alias jpp='watch juju pprint -a'
+alias jp='juju status --format=short'
+alias jt='juju status --format=tabular'
+alias jpp='watch -n1 juju status --format=short'
+alias jpt='watch -n1 juju status --format=tabular'
 alias dhx='juju dhx'
 alias jl='juju debug-log'
 alias jrun='juju run'
 alias jssh='juju ssh'
-alias jrs='juju remove-service'
+alias jr-s='juju remove-service'
+alias ja-r='juju add-relation'
+alias jr-r='juju remove-relation'
 
 function jd() {
+    series="trusty"
+    if [[ "$(pwd)" == */precise/* ]]; then
+        series="precise"
+    fi
+    name=""
     charm="$1"
     shift
+    if [[ "$charm" == "-n" ]]; then
+        charm=""
+        name="$1"
+        shift
+    fi
     if [[ -z "$charm" ]]; then
         charm=$(grep name: metadata.yaml | awk '{print $2}')
-        if [[ "$(pwd)" == */precise/* ]]; then
-            charm="local:precise/$charm"
-        elif [[ "$(pwd)" == */trusty/* ]]; then
-            charm="local:trusty/$charm"
-        else
-            rm -f $JUJU_REPOSITORY/trusty/$charm
-            ln -s "$(pwd)" $JUJU_REPOSITORY/trusty/$charm
-            charm="local:trusty/$charm"
+        charmdir="$JR/$series/$charm"
+        if [[ -L "$charmdir" ]]; then
+            charmdir="$(readlink "$charmdir")"
+        fi
+        if [[ ! "$(pwd)" -ef "$charmdir" ]]; then
+            2> echo "Current directory does not match charm that would be deployed.  Do you need to switche envs?"
+            return 1
         fi
     fi
-    juju deploy "$charm" "$@"
+    if [[ "$charm" != *: && -e "$JR/$series/$charm" ]]; then
+        charm="local:$series/$charm"
+    fi
+    juju deploy "$charm" $name "$@"
 }
 
 function js() {
@@ -31,10 +47,38 @@ function js() {
     ~/bin/juju-machine-count > ~/.juju/.machine-count
 }
 
+function jcs() {
+    export JR="/home/johnsca/juju/envs/$1"
+    export JUJU_REPOSITORY="$JR"
+    export LAYER_PATH="$JR/layers"
+    export INTERFACE_PATH="$JR/interfaces"
+}
+
+function jcs~() {
+    jcs "$1"
+    case "$2" in
+        -l) cd $JR/layers;;
+        -i) cd $JR/interfaces;;
+        -b) cd $JR/bundles;;
+         *) cd $JR/trusty;;
+     esac
+}
+
 function jdest() {
     jenv=${1-$(juju switch)}
-    juju destroy-environment -y $jenv
+    juju destroy-environment -y $jenv "$@"
     ~/bin/juju-machine-count > ~/.juju/.machine-count
+}
+
+function render-bundle() {
+    bundle="${1-bundle.yaml}"
+    output="${2-`echo $bundle | sed -e 's/.yaml$/.svg/'`}"
+    curl -d "$(cat $bundle)" http://svg.juju.solutions/ > $output
+}
+
+function jdo {
+    action_id=`juju action do "$@" | cut -f2 -d:`
+    juju action fetch --wait 0 $action_id
 }
 
 alias juju-secret='grep admin-secret ~/.juju/environments/`juju switch`.jenv | sed -e "s/  admin-secret: //"'

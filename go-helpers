@@ -1,0 +1,10 @@
+#!/bin/bash
+
+function gocd() {
+    cd "$GOPATH/src/$@"
+}
+
+function _gocd() {
+    CDPATH=$GOPATH/src _cd
+}
+complete -o nospace -F _gocd gocd

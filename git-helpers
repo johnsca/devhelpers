@@ -30,6 +30,7 @@ unalias merge 2> /dev/null
 unalias gdiff 2> /dev/null
 unalias st 2> /dev/null
 unalias unpushed 2> /dev/null
+unalias gl 2> /dev/null
 
 USE_CTAGS="true"
 TAB_COMPLETE_REMOTE_BRANCHES="true"
@@ -68,6 +69,8 @@ alias merge='git merge'
 alias gdiff='git diff'
 #alias unpushed='git branch -vv | grep ahead'
 alias unpushed='git log --branches --not --remotes --simplify-by-decoration --decorate --oneline'
+alias gl='glog -10'
+alias gll='git log --graph --decorate --pretty=oneline --abbrev-commit --all'
 
 DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DHP=$DEVHELPERS_DIR/helpers.py
@@ -215,18 +218,42 @@ glog() {
 
 # Show the full changelog, marked by release tags, starting with HEAD
 changelog() {
-        IFS=$'\n';
-        for i in $(git --no-pager tag -l "*$1*" | sort -r | awk '{ if (a) print a " " $1; else print "HEAD " $1 ;a=$1}') ;
-                        do print_changelog ${i% *} ${i#* };
-        done
+    usage="Usage: changelog [-p PATTERN] [FROM] [TO]
+
+      PATTERN  Fragment of tags to match, e.g. 'releaase-'
+      FROM     Tag to start from
+      TO       Tag to show up until (non-inclusive)
+"
+    pat=
+    range=
+    while [ "$1" ]; do
+        case $1 in
+            -h) echo "$usage"; return;;
+            -p) shift; pat="-l*$1*";;
+            *)
+                if [[ -z $range ]]; then
+                    range=$1
+                else
+                    range=$1..$range
+                fi
+                ;;
+        esac
+        shift
+    done
+
+    IFS=$'\n';
+    for i in $(git --no-pager tag "$pat" | sort -r | awk '{ if (a) print a " " $1; else print "HEAD " $1 ;a=$1}'); do
+        print_changelog ${i% *} ${i#* }
         echo
+    done
+    echo
 }
 
 # Prints the changelog between one tag and another; used by changelog()
 print_changelog() {
-        echo $1;
-        git --no-pager log --pretty=format:"    %h %ad - %s" --date=short --no-merges $2..$1
-        echo
+    echo $1;
+    git --no-pager log --pretty=format:"    %h [%an] %s" --date=short --no-merges $2..$1
+    echo
 }
 
 # A pretty-printed shortlog without merges
