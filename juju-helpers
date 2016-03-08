@@ -1,7 +1,7 @@
 #!/bin/bash
 
 alias jp='juju status --format=short'
-alias jt='juju status --format=tabular'
+alias jst='juju status --format=tabular'
 alias jpp='watch -n1 juju status --format=short'
 alias jpt='watch -n1 juju status --format=tabular'
 alias dhx='juju dhx'
@@ -26,13 +26,13 @@ function jd() {
         shift
     fi
     if [[ -z "$charm" ]]; then
-        charm=$(grep name: metadata.yaml | awk '{print $2}')
+        charm=$(yq metadata.yaml name)
         charmdir="$JR/$series/$charm"
         if [[ -L "$charmdir" ]]; then
             charmdir="$(readlink "$charmdir")"
         fi
         if [[ ! "$(pwd)" -ef "$charmdir" ]]; then
-            2> echo "Current directory does not match charm that would be deployed.  Do you need to switche envs?"
+            >&2 echo "Current directory does not match charm that would be deployed.  Do you need to switch envs?"
             return 1
         fi
     fi
@@ -47,8 +47,13 @@ function js() {
     ~/bin/juju-machine-count > ~/.juju/.machine-count
 }
 
+function jcc() {
+    mkdir -p "$HOME/juju/envs/$1"
+    jcs~ "$@"
+}
+
 function jcs() {
-    export JR="/home/johnsca/juju/envs/$1"
+    export JR="$HOME/juju/envs/$1"
     export JUJU_REPOSITORY="$JR"
     export LAYER_PATH="$JR/layers"
     export INTERFACE_PATH="$JR/interfaces"
@@ -59,7 +64,7 @@ function jcs~() {
     case "$2" in
         -l) cd $JR/layers;;
         -i) cd $JR/interfaces;;
-        -b) cd $JR/bundles;;
+        -b) cd $JR/bundle;;
          *) cd $JR/trusty;;
      esac
 }
@@ -77,8 +82,10 @@ function render-bundle() {
 }
 
 function jdo {
-    action_id=`juju action do "$@" | cut -f2 -d:`
-    juju action fetch --wait 0 $action_id
+    action_id=`set -o pipefail; juju action do "$@" | cut -f2 -d:`
+    if [[ $? == 0 ]]; then
+        juju action fetch --wait 0 $action_id
+    fi
 }
 
 alias juju-secret='grep admin-secret ~/.juju/environments/`juju switch`.jenv | sed -e "s/  admin-secret: //"'

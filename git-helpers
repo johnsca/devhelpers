@@ -308,7 +308,7 @@ checkout() {
         return 1
     fi
 
-    if [[ "$new" == ".." ]]; then
+    if [[ "$new" == "-" ]]; then
         git checkout @{-1}
         return
     fi
