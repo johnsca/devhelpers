@@ -31,6 +31,8 @@ unalias gdiff 2> /dev/null
 unalias st 2> /dev/null
 unalias unpushed 2> /dev/null
 unalias gl 2> /dev/null
+unalias glt 2> /dev/null
+unalias gll 2> /dev/null
 
 USE_CTAGS="true"
 TAB_COMPLETE_REMOTE_BRANCHES="true"
@@ -69,8 +71,8 @@ alias merge='git merge'
 alias gdiff='git diff'
 #alias unpushed='git branch -vv | grep ahead'
 alias unpushed='git log --branches --not --remotes --simplify-by-decoration --decorate --oneline'
-alias gl='glog -10'
-alias gll='git log --graph --decorate --pretty=oneline --abbrev-commit --all'
+alias gl='glog -10 --show-tags'
+alias gll='git log --graph --decorate --pretty=oneline --abbrev-commit'
 
 DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DHP=$DEVHELPERS_DIR/helpers.py

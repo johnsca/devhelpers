@@ -1,24 +1,146 @@
 #!/bin/bash
 
-alias jp='juju status --format=short'
-alias jst='juju status --format=tabular'
-alias jpp='watch -n1 juju status --format=short'
-alias jpt='watch -n1 juju status --format=tabular'
+unalias jst 2> /dev/null
+unset -f jst
+function jst() {
+    if [[ $(juju version) == "2."* ]]; then
+        juju status --color "$@"
+    else
+        juju status --format=tabular
+    fi
+}
+
+unalias jpt 2> /dev/null
+unset -f jpt
+function jpt() {
+    if [[ $(juju version) == "2."* ]]; then
+        watch -n1 --color -- juju status --color "$@"
+    else
+        watch -n1 -- juju status --format=tabular
+    fi
+}
+
+unalias jr-a 2> /dev/null
+unalias jr-s 2> /dev/null
+unset -f jr-a
+function jr-a() {
+    if [[ $(juju version) == "2."* ]]; then
+        juju remove-application "$@"
+    else
+        juju remove-service "$@"
+    fi
+}
+alias jr-s='jr-a'
+
 alias dhx='juju dhx'
-alias jl='juju debug-log'
-alias jrun='juju run'
-alias jssh='juju ssh'
-alias jr-s='juju remove-service'
+alias jr-m='juju remove-machine'
 alias ja-r='juju add-relation'
 alias jr-r='juju remove-relation'
+alias ja-u='juju add-unit'
+alias jr-u='juju remove-unit'
+alias jam='juju add-model --config test-mode=true'
+
+unset -f jdm
+function jdm() {
+    for model in "$@"; do
+        juju show-model $model | grep -q 'cloud: localhost'
+        lxd=$?
+        juju destroy-model --destroy-storage -y $model
+        if (( $lxd )); then
+            lxc profile delete juju-$model
+        fi
+    done
+}
+
+unset -f unit
+function _unit() {
+    unit=$1
+    shift
+    if [[ -z "$unit" ]]; then
+        # nothing specified, take first errored unit, or no filter
+        unit="$(juju status | grep '/.*error' | cut -f1 -d' ' | tr -d '*' | head -n1)"
+    elif ! echo "$unit" | grep -q '[-/]'; then
+        # application name specified; take first errored unit or first unit
+        units="$(juju status $unit | grep '/[0-9]')"
+        unit="$(echo "$units" | grep 'error')"
+        if [[ -z "$unit" ]]; then
+            unit="$(echo "$units" | head -n1)"
+        fi
+        unit="$(echo "$unit" | cut -f1 -d' ' | tr -d '*')"
+    fi
+    echo -n "$unit"
+}
+
+unset -f _filter
+function _filter() {
+    unit="$(_unit $1)"
+    if [[ "$unit" == */* ]]; then
+        unit="$(echo unit-$unit | tr '/' '-')"
+    fi
+    if [[ -n "$unit" ]]; then
+        echo -n "-i $unit"
+    fi
+}
+
+unalias jssh 2> /dev/null
+unset -f jssh
+function jssh() {
+    unit="$(_unit $1)"
+    if [[ -z "$unit" ]]; then
+        >&2 echo "Unable to find unit for: $1"
+        return 1
+    fi
+    echo "Connecting to $unit"
+    juju ssh "$unit"
+}
+
+unset -f jl
+function jl() {
+    unit="$(_filter $1)"
+    shift
+    if [[ $(juju version) == "2."* ]]; then
+        color="--color"
+    else
+        color=""
+    fi
+    juju debug-log $color $unit "$@"
+}
+unset -f jll
+function jll() {
+    unit="$(_filter $1)"
+    shift
+    if [[ $(juju version) == "2."* ]]; then
+        color="--color"
+    else
+        color=""
+    fi
+    juju debug-log $color --replay $unit "$@" | less -R +G
+}
 
 function jd() {
-    series="trusty"
-    if [[ "$(pwd)" == */precise/* ]]; then
+    if [[ -z "$JUJU_REPOSITORY" ]]; then
+        >&2 echo "JUJU_REPOSTIORY is not set"
+        return 1
+    elif [[ -z "$JR" ]]; then
+        JR="$JUJU_REPOSTIORY"
+    fi
+    if [[ $(juju version) == "2."* ]]; then
+        series="bionic"
+    else
+        series="trusty"
+    fi
+    if [[ "$(pwd)" == */bionic/* ]]; then
+        series="bionic"
+    elif [[ "$(pwd)" == */xenial/* ]]; then
+        series="xenial"
+    elif [[ "$(pwd)" == */trusty/* ]]; then
+        series="trusty"
+    elif [[ "$(pwd)" == */precise/* ]]; then
         series="precise"
     fi
     name=""
     charm="$1"
+    series_arg=""
     shift
     if [[ "$charm" == "-n" ]]; then
         charm=""
@@ -27,19 +149,32 @@ function jd() {
     fi
     if [[ -z "$charm" ]]; then
         charm=$(yq metadata.yaml name)
-        charmdir="$JR/$series/$charm"
+        charmdir="$JUJU_REPOSITORY/$series/$charm"
         if [[ -L "$charmdir" ]]; then
             charmdir="$(readlink "$charmdir")"
         fi
-        if [[ ! "$(pwd)" -ef "$charmdir" ]]; then
-            >&2 echo "Current directory does not match charm that would be deployed.  Do you need to switch envs?"
-            return 1
+    fi
+    if [[ "$charm" != *: && ( -e "$JR/$series/$charm" || -e "$JR/builds/$charm" ) ]]; then
+        if [[ -e "$JR/builds/$charm" ]]; then
+            charm_path="./$(realpath --relative-to . "$JR/builds/$charm")"
+        else
+            charm_path="./$(realpath --relative-to . "$JR/$series/$charm")"
+        fi
+        >&2 echo "Deploying from $charm_path"
+        if [[ $(juju version) == "2."* ]]; then
+            charm="$charm_path"
+            if [[ "$*" != *--series* ]]; then
+                series_arg="--series $series"
+            fi
+        else
+            if [[ ! -e "$JR/$series/$charm" && "$charm_path" == */builds/* ]]; then
+                echo "Adding symlink to \$JR/builds/$charm at \$JR/$series/$charm"
+                ln -s "$(realpath $charm_path)" "$JR/$series/$charm"
+            fi
+            charm="local:$series/$charm"
         fi
     fi
-    if [[ "$charm" != *: && -e "$JR/$series/$charm" ]]; then
-        charm="local:$series/$charm"
-    fi
-    juju deploy "$charm" $name "$@"
+    juju deploy $series_arg "$charm" $name "$@"
 }
 
 function js() {
@@ -48,7 +183,7 @@ function js() {
 }
 
 function jcc() {
-    mkdir -p "$HOME/juju/envs/$1"
+    mkdir -p "$HOME/juju/envs/$1/"{layers,interfaces,bundle,trusty}
     jcs~ "$@"
 }
 
@@ -59,33 +194,77 @@ function jcs() {
     export INTERFACE_PATH="$JR/interfaces"
 }
 
+unset -f jcs~
 function jcs~() {
     jcs "$1"
     case "$2" in
-        -l) cd $JR/layers;;
         -i) cd $JR/interfaces;;
         -b) cd $JR/bundle;;
-         *) cd $JR/trusty;;
+         *) cd $JR/layers;;
      esac
 }
 
 function jdest() {
-    jenv=${1-$(juju switch)}
-    juju destroy-environment -y $jenv "$@"
-    ~/bin/juju-machine-count > ~/.juju/.machine-count
+    if [[ $(juju version) == "2."* ]]; then
+        controller=${1:-$(juju controllers --format=json | jq -r '."current-controller"')}
+        juju destroy-controller --destroy-all-models $controller
+    else
+        jenv=${1-$(juju switch)}
+        juju destroy-environment -y $jenv "$@"
+        ~/bin/juju-machine-count > ~/.juju/.machine-count &
+    fi
 }
 
 function render-bundle() {
     bundle="${1-bundle.yaml}"
-    output="${2-`echo $bundle | sed -e 's/.yaml$/.svg/'`}"
-    curl -d "$(cat $bundle)" http://svg.juju.solutions/ > $output
+    output="${2-`echo $bundle | sed -e 's/.yaml$/.png/'`}"
+    curl -d "$(cat $bundle)" http://svg.juju.solutions/?output=png > $output
 }
 
 function jdo {
-    action_id=`set -o pipefail; juju action do "$@" | cut -f2 -d:`
+    if [[ $(juju version) == "2."* ]]; then
+        run_action='run-action'
+        show_action_output='show-action-output'
+    else
+        run_action='action do'
+        show_action_output='action fetch'
+    fi
+    action_id=`set -o pipefail; juju $run_action "$@" | cut -f2 -d:`
     if [[ $? == 0 ]]; then
-        juju action fetch --wait 0 $action_id
+        echo "Action ID: $action_id"
+        juju $show_action_output --wait 0 $action_id
     fi
 }
 
+function jrun {
+    if [[ $# == 1 ]]; then
+        selector='--all'
+    elif [[ "$1" == *'/'* ]]; then
+        selector='--unit'
+    else
+        if [[ $(juju version) == "2."* ]]; then
+            selector='--application'
+        else
+            selector='--service'
+        fi
+    fi
+    juju run $selector "$@"
+}
+
 alias juju-secret='grep admin-secret ~/.juju/environments/`juju switch`.jenv | sed -e "s/  admin-secret: //"'
+
+function pull-src {
+    output=$(charm pull-source "$@")
+    echo $output
+    cd $(echo $output | cut -d' ' -f4)
+    if git remote -v | egrep -q 'github.com/juju(-solutions)?'; then
+        git remote set-url origin $(git remote -v | head -n1 | awk '{print $2}' | sed -e 's=https://github.com/=git@github.com:=')
+    fi
+}
+
+# compare two charm store revisions to see if they're the same entity
+function comp-rev {
+    if [[ `charm show $1 hash` == `charm show $2 hash` ]]; then
+        echo Match
+    fi
+}
