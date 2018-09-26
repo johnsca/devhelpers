@@ -1,0 +1,19 @@
+#!/usr/bin/python3
+
+import os
+import json
+import subprocess
+
+with open(os.devnull, 'w') as devnull:
+    try:
+        version = subprocess.check_output(
+            ['/usr/bin/env', 'juju', 'version'],
+            stderr=devnull).decode('utf8')
+        status = json.loads(subprocess.check_output(
+            ['/usr/bin/env', 'juju', 'status', '--format=json'],
+            stderr=devnull).decode('utf8'))
+    except subprocess.CalledProcessError:
+        print("-")
+    else:
+        controller = 1 if version.startswith('1.') else 0
+        print(len(status["machines"]) - controller)

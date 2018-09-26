@@ -27,7 +27,7 @@ LP_PS1="${LP_PS1_PREFIX}${LP_TIME}${LP_BATT}${LP_LOAD}${LP_JOBS}"
 # add user, host and permissions colon
 LP_PS1="${LP_PS1}[${LP_USER}${LP_HOST}${LP_PERM}"
 
-LP_JENV=" $(timeout 0.5 bash -c 'juju switch 2> /dev/null || echo -' || echo '?'):$(timeout 0.5 ~/bin/juju-machine-count || cat ~/.juju/.machine-count)"
+LP_JENV=" $(timeout 0.5s bash -c 'juju switch 2> /dev/null || echo -' || echo '?'):$(timeout 0.5s ~/.devhelpers/juju-machine-count 2> /dev/null || cat ~/.juju/.machine-count)"
 
 # if not root
 if [[ "$EUID" -ne "0" ]]
