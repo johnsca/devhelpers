@@ -118,11 +118,11 @@ function jll() {
 }
 
 function jd() {
-    if [[ -z "$JUJU_REPOSITORY" ]]; then
-        >&2 echo "JUJU_REPOSTIORY is not set"
+    if [[ -z "$CHARM_BUILD_DIR" ]]; then
+        >&2 echo "CHARM_BUILD_DIR is not set"
         return 1
     elif [[ -z "$JR" ]]; then
-        JR="$JUJU_REPOSTIORY"
+        JR="$(dirname "$CHARM_BUILD_DIR")"
     fi
     if [[ $(juju version) == "2."* ]]; then
         series="bionic"
@@ -149,16 +149,16 @@ function jd() {
     fi
     if [[ -z "$charm" ]]; then
         charm=$(yq metadata.yaml name)
-        charmdir="$JUJU_REPOSITORY/$series/$charm"
+        charmdir="$CHARM_BUILD_DIR/$series/$charm"
         if [[ -L "$charmdir" ]]; then
             charmdir="$(readlink "$charmdir")"
         fi
     fi
-    if [[ "$charm" != *: && ( -e "$JR/$series/$charm" || -e "$JR/builds/$charm" ) ]]; then
-        if [[ -e "$JR/builds/$charm" ]]; then
-            charm_path="./$(realpath --relative-to . "$JR/builds/$charm")"
+    if [[ "$charm" != *: && ( -e "$CBD/$series/$charm" || -e "$CBD/builds/$charm" ) ]]; then
+        if [[ -e "$CBD/builds/$charm" ]]; then
+            charm_path="./$(realpath --relative-to . "$CBD/builds/$charm")"
         else
-            charm_path="./$(realpath --relative-to . "$JR/$series/$charm")"
+            charm_path="./$(realpath --relative-to . "$CBD/$series/$charm")"
         fi
         >&2 echo "Deploying from $charm_path"
         if [[ $(juju version) == "2."* ]]; then
@@ -167,9 +167,9 @@ function jd() {
                 series_arg="--series $series"
             fi
         else
-            if [[ ! -e "$JR/$series/$charm" && "$charm_path" == */builds/* ]]; then
-                echo "Adding symlink to \$JR/builds/$charm at \$JR/$series/$charm"
-                ln -s "$(realpath $charm_path)" "$JR/$series/$charm"
+            if [[ ! -e "$CBD/$series/$charm" && "$charm_path" == */builds/* ]]; then
+                echo "Adding symlink to \$CBD/builds/$charm at \$CBD/$series/$charm"
+                ln -s "$(realpath $charm_path)" "$CBD/$series/$charm"
             fi
             charm="local:$series/$charm"
         fi
@@ -179,28 +179,40 @@ function jd() {
 
 function js() {
     juju switch "$@"
-    ~/bin/juju-machine-count > ~/.juju/.machine-count
+    ~/.devhelpers/juju-machine-count > ~/.juju/.machine-count
 }
 
 function jcc() {
-    mkdir -p "$HOME/juju/envs/$1/"{layers,interfaces,bundle,trusty}
+    mkdir -p "$HOME/juju/envs/$1/"{charms,layers,interfaces,bundles,builds}
     jcs~ "$@"
 }
 
 function jcs() {
     export JR="$HOME/juju/envs/$1"
-    export JUJU_REPOSITORY="$JR"
-    export LAYER_PATH="$JR/layers"
-    export INTERFACE_PATH="$JR/interfaces"
+    export CHARM_LAYERS_DIR="$JR/layers"
+    export CHARM_INTERFACES_DIR="$JR/interfaces"
+    export CHARM_BUILD_DIR="$JR/builds"
 }
+
+
+unset -f juju-current-model
+function juju-current-model {
+    if [[ -n "$JUJU_MODEL" ]]; then
+        echo "$JUJU_MODEL"
+    else
+        timeout 0.5s bash -c 'juju switch 2> /dev/null || echo -' || echo '?'
+    fi
+}
+
 
 unset -f jcs~
 function jcs~() {
     jcs "$1"
     case "$2" in
         -i) cd $JR/interfaces;;
-        -b) cd $JR/bundle;;
-         *) cd $JR/layers;;
+        -b) cd $JR/bundles;;
+        -l) cd $JR/layers;;
+         *) cd $JR/charms;;
      esac
 }
 
@@ -211,7 +223,7 @@ function jdest() {
     else
         jenv=${1-$(juju switch)}
         juju destroy-environment -y $jenv "$@"
-        ~/bin/juju-machine-count > ~/.juju/.machine-count &
+        ~/.devhelpers/juju-machine-count > ~/.juju/.machine-count &
     fi
 }
 

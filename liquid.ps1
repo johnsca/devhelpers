@@ -27,7 +27,7 @@ LP_PS1="${LP_PS1_PREFIX}${LP_TIME}${LP_BATT}${LP_LOAD}${LP_JOBS}"
 # add user, host and permissions colon
 LP_PS1="${LP_PS1}[${LP_USER}${LP_HOST}${LP_PERM}"
 
-LP_JENV=" $(timeout 0.5s bash -c 'juju switch 2> /dev/null || echo -' || echo '?'):$(timeout 0.5s ~/.devhelpers/juju-machine-count 2> /dev/null || cat ~/.juju/.machine-count)"
+LP_JENV=" $(juju-current-model):$(timeout 0.5s ~/.devhelpers/juju-machine-count 2> /dev/null || cat ~/.cache/juju-machine-count 2> /dev/null || echo '?')"
 
 # if not root
 if [[ "$EUID" -ne "0" ]]
@@ -43,7 +43,7 @@ else
     [[ "$LP_ENABLE_VCS_ROOT" = "1" ]] && LP_PS1="${LP_PS1}${LP_VCS}"
 fi
 # add return code and prompt mark
-LP_PS1="${LP_PS1}${LP_RUNTIME}${LP_ERR}${LP_MARK}"
+LP_PS1="${LP_PS1}${LP_RUNTIME}${LP_ERR} ${LP_MARK}"
 
 # "invisible" parts
 # Get the current prompt on the fly and make it a title
