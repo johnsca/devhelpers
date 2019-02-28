@@ -233,18 +233,16 @@ function render-bundle() {
     curl -d "$(cat $bundle)" http://svg.juju.solutions/?output=png > $output
 }
 
+unset -f jcs~
 function jdo {
     if [[ $(juju version) == "2."* ]]; then
-        run_action='run-action'
-        show_action_output='show-action-output'
+        juju run-action --wait "$@"
     else
-        run_action='action do'
-        show_action_output='action fetch'
-    fi
-    action_id=`set -o pipefail; juju $run_action "$@" | cut -f2 -d:`
-    if [[ $? == 0 ]]; then
-        echo "Action ID: $action_id"
-        juju $show_action_output --wait 0 $action_id
+        action_id=`set -o pipefail; juju action do "$@" | cut -f2 -d:`
+        if [[ $? == 0 ]]; then
+            echo "Action ID: $action_id"
+            juju action fetch --wait 0 $action_id
+        fi
     fi
 }
 
