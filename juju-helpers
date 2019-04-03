@@ -148,18 +148,14 @@ function jd() {
         shift
     fi
     if [[ -z "$charm" ]]; then
-        charm=$(yq metadata.yaml name)
+        charm=$(yq read metadata.yaml name)
         charmdir="$CHARM_BUILD_DIR/$series/$charm"
         if [[ -L "$charmdir" ]]; then
             charmdir="$(readlink "$charmdir")"
         fi
     fi
-    if [[ "$charm" != *: && ( -e "$CBD/$series/$charm" || -e "$CBD/builds/$charm" ) ]]; then
-        if [[ -e "$CBD/builds/$charm" ]]; then
-            charm_path="./$(realpath --relative-to . "$CBD/builds/$charm")"
-        else
-            charm_path="./$(realpath --relative-to . "$CBD/$series/$charm")"
-        fi
+    if [[ "$charm" != *: && -e "$CBD/$charm" ]]; then
+        charm_path="./$(realpath --relative-to . "$CBD/$charm")"
         >&2 echo "Deploying from $charm_path"
         if [[ $(juju version) == "2."* ]]; then
             charm="$charm_path"
