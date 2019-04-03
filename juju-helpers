@@ -124,23 +124,8 @@ function jd() {
     elif [[ -z "$JR" ]]; then
         JR="$(dirname "$CHARM_BUILD_DIR")"
     fi
-    if [[ $(juju version) == "2."* ]]; then
-        series="bionic"
-    else
-        series="trusty"
-    fi
-    if [[ "$(pwd)" == */bionic/* ]]; then
-        series="bionic"
-    elif [[ "$(pwd)" == */xenial/* ]]; then
-        series="xenial"
-    elif [[ "$(pwd)" == */trusty/* ]]; then
-        series="trusty"
-    elif [[ "$(pwd)" == */precise/* ]]; then
-        series="precise"
-    fi
     name=""
     charm="$1"
-    series_arg=""
     shift
     if [[ "$charm" == "-n" ]]; then
         charm=""
@@ -149,28 +134,35 @@ function jd() {
     fi
     if [[ -z "$charm" ]]; then
         charm=$(yq read metadata.yaml name)
-        charmdir="$CHARM_BUILD_DIR/$series/$charm"
-        if [[ -L "$charmdir" ]]; then
-            charmdir="$(readlink "$charmdir")"
-        fi
     fi
     if [[ "$charm" != *: && -e "$CBD/$charm" ]]; then
         charm_path="./$(realpath --relative-to . "$CBD/$charm")"
         >&2 echo "Deploying from $charm_path"
-        if [[ $(juju version) == "2."* ]]; then
-            charm="$charm_path"
-            if [[ "$*" != *--series* ]]; then
-                series_arg="--series $series"
-            fi
-        else
-            if [[ ! -e "$CBD/$series/$charm" && "$charm_path" == */builds/* ]]; then
-                echo "Adding symlink to \$CBD/builds/$charm at \$CBD/$series/$charm"
-                ln -s "$(realpath $charm_path)" "$CBD/$series/$charm"
-            fi
-            charm="local:$series/$charm"
-        fi
+        charm="$charm_path"
     fi
-    juju deploy $series_arg "$charm" $name "$@"
+    juju deploy "$charm" $name "$@"
+}
+
+function ju() {
+    if [[ -z "$CHARM_BUILD_DIR" ]]; then
+        >&2 echo "CHARM_BUILD_DIR is not set"
+        return 1
+    elif [[ -z "$JR" ]]; then
+        JR="$(dirname "$CHARM_BUILD_DIR")"
+    fi
+    charm="$1"
+    shift
+    if [[ -z "$charm" ]]; then
+        charm=$(yq read metadata.yaml name)
+    fi
+    if [[ -e "$CBD/$charm" ]]; then
+        charm_path="./$(realpath --relative-to . "$CBD/$charm")"
+        >&2 echo "Upgrading from $charm_path"
+    else
+        >&2 echo "Unable to determine path for $charm"
+        return
+    fi
+    juju upgrade-charm --force-units "$charm" --path "$charm_path" "$@"
 }
 
 function js() {
