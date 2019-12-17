@@ -1,5 +1,7 @@
 #!/bin/bash
 
+alias df='df -h| grep -vE " /snap|^tmpfs"'
+
 alias tmux=byobu
 alias termbin='nc termbin.com 9999'
 
