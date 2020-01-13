@@ -121,8 +121,8 @@ function jd() {
     if [[ -z "$CHARM_BUILD_DIR" ]]; then
         >&2 echo "CHARM_BUILD_DIR is not set"
         return 1
-    elif [[ -z "$JR" ]]; then
-        JR="$(dirname "$CHARM_BUILD_DIR")"
+    elif [[ -z "$CBD" ]]; then
+        CBD="$CHARM_BUILD_DIR"
     fi
     name=""
     charm="$1"
@@ -132,13 +132,18 @@ function jd() {
         name="$1"
         shift
     fi
-    if [[ -z "$charm" ]]; then
-        charm=$(yq read metadata.yaml name)
-    fi
-    if [[ "$charm" != *: && -e "$CBD/$charm" ]]; then
-        charm_path="./$(realpath --relative-to . "$CBD/$charm")"
-        >&2 echo "Deploying from $charm_path"
-        charm="$charm_path"
+    if [[ -e layer.yaml ]]; then
+        if [[ -z "$charm" ]]; then
+            charm=$(yq read metadata.yaml name)
+        fi
+        if [[ "$charm" != *: && -e "$CBD/$charm" ]]; then
+            charm_path="./$(realpath --relative-to . "$CBD/$charm")"
+            >&2 echo "Deploying from $charm_path"
+            charm="$charm_path"
+        fi
+    else
+        >&2 echo "Deploying from ."
+        charm=.
     fi
     juju deploy "$charm" $name "$@"
 }
@@ -178,8 +183,11 @@ function jcc() {
 function jcs() {
     export JR="$HOME/juju/envs/$1"
     export CHARM_LAYERS_DIR="$JR/layers"
+    export CLD="$CHARM_LAYERS_DIR"
     export CHARM_INTERFACES_DIR="$JR/interfaces"
+    export CID="$CHARM_INTERFACES_DIR"
     export CHARM_BUILD_DIR="$JR/builds"
+    export CBD="$CHARM_BUILD_DIR"
 }
 
 
@@ -216,12 +224,12 @@ function jdest() {
 }
 
 function render-bundle() {
-    bundle="${1-bundle.yaml}"
-    output="${2-`echo $bundle | sed -e 's/.yaml$/.png/'`}"
+    bundle="${1:-bundle.yaml}"
+    output="${2:-`echo $bundle | sed -e 's/.yaml$/.png/'`}"
     curl -d "$(cat $bundle)" http://svg.juju.solutions/?output=png > $output
 }
 
-unset -f jcs~
+unset -f jdo
 function jdo {
     if [[ $(juju version) == "2."* ]]; then
         juju run-action --wait "$@"
