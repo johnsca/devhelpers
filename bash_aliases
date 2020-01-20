@@ -1,6 +1,6 @@
 #!/bin/bash
 
-alias df='df -h| grep -vE " /snap|^tmpfs|^overlay|^shm"'
+alias df='df -h -x squashfs -x overlay | grep -vE " /snap|^tmpfs|^shm"'
 
 alias tmux=byobu
 alias termbin='nc termbin.com 9999'
@@ -15,6 +15,20 @@ fi
 
 alias open='xdg-open'
 alias jbs='juju bootstrap --config test-mode=true'
+alias du='du -bhs'
+alias ip='ip -c'
+
+unset -f nova
+function nova() {
+    . ~/.config/canonistack/novarc_lcy01
+    /usr/bin/nova "$@"
+}
+
+unset -f glance
+function glance() {
+    . ~/.config/canonistack/novarc_lcy01
+    /usr/bin/glance "$@"
+}
 
 #function jbs() {
 #    jenv=${1-$(juju switch)}

@@ -14,9 +14,9 @@ unalias jpt 2> /dev/null
 unset -f jpt
 function jpt() {
     if [[ $(juju version) == "2."* ]]; then
-        watch -n1 --color -- juju status --color "$@"
+        watch -n1 -d -t --color -- juju status --color "$@"
     else
-        watch -n1 -- juju status --format=tabular
+        watch -n1 -d -t -- juju status --format=tabular
     fi
 }
 
@@ -172,7 +172,7 @@ function ju() {
 
 function js() {
     juju switch "$@"
-    ~/.devhelpers/juju-machine-count > ~/.juju/.machine-count
+    ~/.devhelpers/juju-machine-count > ~/.cache/juju-machine-count
 }
 
 function jcc() {
