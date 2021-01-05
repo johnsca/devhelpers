@@ -31,11 +31,12 @@ if (( LP_ENABLE_GIT )); then
         local remote_branch
         local commit_ahead
         local commit_behind
-        changes="$(git diff --shortstat HEAD 2>/dev/null)"
+        changes="$(\git diff --shortstat HEAD 2>/dev/null)"
         remote="$(\git config --get branch.${branch}.remote 2>/dev/null)"
         if [[ -n "$remote" ]]; then
             remote_branch="$(\git config --get branch.${branch}.merge)"
             if [[ -n "$remote_branch" ]]; then
+                remote_branch=${remote_branch/refs\/heads/refs\/remotes\/$remote}
                 commit_ahead="$(\git rev-list --count $remote_branch..HEAD 2>/dev/null)"
                 commit_behind="$(\git rev-list --count HEAD..$remote_branch 2>/dev/null)"
             fi
@@ -43,9 +44,9 @@ if (( LP_ENABLE_GIT )); then
         local vcs_color
         if [[ -n "$changes" ]]; then
             vcs_color="$LP_COLOR_CHANGES"
-        elif [[ "$commits_ahead" -ne "0" ]]; then
+        elif [[ "$commit_ahead" -ne "0" ]]; then
             vcs_color="$LP_COLOR_COMMITS"
-        elif [[ "$commits_behind" -ne "0" ]]; then
+        elif [[ "$commit_behind" -ne "0" ]]; then
             vcs_color="$LP_COLOR_COMMITS_BEHIND"
         else
             vcs_color="$LP_COLOR_UP"
