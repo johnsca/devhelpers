@@ -1,19 +1,11 @@
-#!/usr/bin/python3
+#!/bin/bash
 
-import os
-import json
-import subprocess
-
-with open(os.devnull, 'w') as devnull:
-    try:
-        version = subprocess.check_output(
-            ['/usr/bin/env', 'juju', 'version'],
-            stderr=devnull).decode('utf8')
-        status = json.loads(subprocess.check_output(
-            ['/usr/bin/env', 'juju', 'status', '--format=json'],
-            stderr=devnull).decode('utf8'))
-    except subprocess.CalledProcessError:
-        print("-")
-    else:
-        controller = 1 if version.startswith('1.') else 0
-        print(len(status["machines"]) - controller)
+controller="$(juju controllers --format=json | jq -r '.["current-controller"]')"
+if [[ -n "$controller" ]]; then
+    model="$(juju controllers --format=json | jq -r ".controllers[\"$controller\"][\"current-model\"]" | sed -e 's:^.*/::')"
+    if [[ -n "$model" ]]; then
+        juju models | grep '\*' | awk '{print $6}'
+        exit 0
+    fi
+fi
+echo "?"

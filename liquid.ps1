@@ -22,18 +22,50 @@
 # Remember that most features come with their corresponding colors,
 # see the README.
 
+if (( LP_ENABLE_GIT )); then
+    local branch
+    branch="$(_lp_git_branch)"
+    if [[ -n "$branch" ]]; then
+        local changes
+        local remote
+        local remote_branch
+        local commit_ahead
+        local commit_behind
+        changes="$(git diff --shortstat HEAD 2>/dev/null)"
+        remote="$(\git config --get branch.${branch}.remote 2>/dev/null)"
+        if [[ -n "$remote" ]]; then
+            remote_branch="$(\git config --get branch.${branch}.merge)"
+            if [[ -n "$remote_branch" ]]; then
+                commit_ahead="$(\git rev-list --count $remote_branch..HEAD 2>/dev/null)"
+                commit_behind="$(\git rev-list --count HEAD..$remote_branch 2>/dev/null)"
+            fi
+        fi
+        local vcs_color
+        if [[ -n "$changes" ]]; then
+            vcs_color="$LP_COLOR_CHANGES"
+        elif [[ "$commits_ahead" -ne "0" ]]; then
+            vcs_color="$LP_COLOR_COMMITS"
+        elif [[ "$commits_behind" -ne "0" ]]; then
+            vcs_color="$LP_COLOR_COMMITS_BEHIND"
+        else
+            vcs_color="$LP_COLOR_UP"
+        fi
+        LP_VCS=" ${vcs_color}${branch}${NO_COL}"
+    fi
+fi
+
 # add time, jobs, load and battery
 LP_PS1="${LP_PS1_PREFIX}${LP_TIME}${LP_BATT}${LP_LOAD}${LP_JOBS}"
 # add user, host and permissions colon
 LP_PS1="${LP_PS1}[${LP_USER}${LP_HOST}${LP_PERM}"
 
-LP_JENV=" $(juju-current-model):$(timeout 0.5s ~/.devhelpers/juju-machine-count 2> /dev/null || cat ~/.cache/juju-machine-count 2> /dev/null || echo '?')"
+LP_JENV=" $(juju-current-model)"
 
 # if not root
 if [[ "$EUID" -ne "0" ]]
 then
     # path in foreground color
-    LP_PS1="${LP_PS1}${LP_PWD}]${LP_VENV}${LP_JENV}${LP_PROXY}"
+    LP_PS1="${LP_PS1}${LP_PWD}]${LP_VENV}${LP_JENV}"
     # add VCS infos
     LP_PS1="${LP_PS1}${LP_VCS}"
     LP_MARK='$'

@@ -9,6 +9,9 @@ class Config(object):
 
     def __init__(self):
         self.load_rcfile(self.find_rcfile())
+        with os.popen('git branch --list main') as p:
+            if p.read().strip():
+                Config.BASE_BRANCH = 'main'
 
     def find_rcfile(self):
         with os.popen('git rev-parse --show-toplevel') as p:

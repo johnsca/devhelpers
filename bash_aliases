@@ -5,6 +5,10 @@ alias df='df -h -x squashfs -x overlay | grep -vE " /snap|^tmpfs|^shm"'
 alias tmux=byobu
 alias termbin='nc termbin.com 9999'
 
+alias tree="tree -I '__pycache__|*.egg-info'"
+
+alias wkc='watch -n0.5 kubectl'
+
 . ~/.devhelpers/git-helpers
 . ~/.devhelpers/bzr-helpers
 . ~/.devhelpers/juju-helpers
@@ -14,7 +18,6 @@ if [[ -e /usr/share/virtualenvwrapper/virtualenvwrapper.sh ]]; then
 fi
 
 alias open='xdg-open'
-alias jbs='juju bootstrap --config test-mode=true'
 alias du='du -bhs'
 alias ip='ip -c'
 
@@ -29,16 +32,6 @@ function glance() {
     . ~/.config/canonistack/novarc_lcy01
     /usr/bin/glance "$@"
 }
-
-#function jbs() {
-#    jenv=${1-$(juju switch)}
-#    shift
-#    if [[ "$jenv" == aws* ]]; then
-#        juju bootstrap --constraints "instance-type=m3.medium" "$@"
-#    else
-#        juju bootstrap "$@"
-#    fi
-#}
 
 function jres() {
     services="$(juju pprint | sed -e 's/^- \([^\/]*\).*/\1/')"
@@ -213,3 +206,5 @@ function maas-tunnel() {
     shift
     sshoot $cmd maas-tunnel "$@"
 }
+
+alias wkc='watch -tcn0.5 kubectl'

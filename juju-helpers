@@ -14,9 +14,9 @@ unalias jpt 2> /dev/null
 unset -f jpt
 function jpt() {
     if [[ $(juju version) == "2."* ]]; then
-        watch -n1 -d -t --color -- juju status --color "$@"
+        watch -tcn0.5 -- juju status --color "$@"
     else
-        watch -n1 -d -t -- juju status --format=tabular
+        watch -tcn0.5 -- juju status --format=tabular
     fi
 }
 
@@ -38,18 +38,40 @@ alias ja-r='juju add-relation'
 alias jr-r='juju remove-relation'
 alias ja-u='juju add-unit'
 alias jr-u='juju remove-unit'
-alias jam='juju add-model --config test-mode=true'
+alias jam='juju add-model --config test-mode=true --config automatically-retry-hooks=false --config logging-config="<root>=DEBUG"'
+alias jscp='juju scp'
+
+unalias jbs 2> /dev/null
+unset -f jbs
+function jbs() {
+    juju bootstrap \
+        --config test-mode=true \
+        --model-default resource-tags=owner=johnsca \
+        --model-default test-mode=true \
+        --model-default automatically-retry-hooks=false \
+        --model-default logging-config="<root>=DEBUG" \
+        --model-default image-stream=daily \
+        "$@"
+}
+
+function _jdm() {
+    juju show-model "$1" | grep -q 'cloud: localhost'
+    lxd=$?
+    juju destroy-model --destroy-storage -y "$1"
+    if (( $lxd )); then
+        lxc profile delete juju-"$1"
+    fi
+}
 
 unset -f jdm
 function jdm() {
-    for model in "$@"; do
-        juju show-model $model | grep -q 'cloud: localhost'
-        lxd=$?
-        juju destroy-model --destroy-storage -y $model
-        if (( $lxd )); then
-            lxc profile delete juju-$model
-        fi
-    done
+    if [[ "$@" == "" ]]; then
+        _jdm "$(juju models --format=json | jq -r '."current-model"')"
+    else
+        for model in "$@"; do
+            _jdm "$model"
+        done
+    fi
 }
 
 unset -f unit
@@ -82,39 +104,32 @@ function _filter() {
     fi
 }
 
-unalias jssh 2> /dev/null
 unset -f jssh
-function jssh() {
-    unit="$(_unit $1)"
-    if [[ -z "$unit" ]]; then
-        >&2 echo "Unable to find unit for: $1"
-        return 1
-    fi
-    echo "Connecting to $unit"
-    juju ssh "$unit"
-}
+alias jssh='juju ssh'
 
 unset -f jl
 function jl() {
-    unit="$(_filter $1)"
-    shift
+    if [[ -n "$1" && $1 != "-"* ]]; then
+        set -- "-i" "$1" "${@:2}"
+    fi
     if [[ $(juju version) == "2."* ]]; then
         color="--color"
     else
         color=""
     fi
-    juju debug-log $color $unit "$@"
+    juju debug-log $color "$@"
 }
 unset -f jll
 function jll() {
-    unit="$(_filter $1)"
-    shift
+    if [[ -n "$1" && $1 != "-"* ]]; then
+        set -- "-i" "$1" "${@:2}"
+    fi
     if [[ $(juju version) == "2."* ]]; then
         color="--color"
     else
         color=""
     fi
-    juju debug-log $color --replay $unit "$@" | less -R +G
+    juju debug-log $color --replay "$@" | less -R +G -F
 }
 
 function jd() {
@@ -188,6 +203,12 @@ function jcs() {
     export CID="$CHARM_INTERFACES_DIR"
     export CHARM_BUILD_DIR="$JR/builds"
     export CBD="$CHARM_BUILD_DIR"
+    export CHARM_CHARMS_DIR="$JR/charms"
+    export CCD="$CHARM_CHARMS_DIR"
+    export CHARM_OVERLAYS_DIR="$JR/overlays"
+    export COD="$CHARM_OVERLAYS_DIR"
+    export CHARM_BUNDLES_DIR="$JR/bundles"
+    export CBND="$CHARM_BUNDLES_DIR"
 }
 
 
@@ -196,7 +217,27 @@ function juju-current-model {
     if [[ -n "$JUJU_MODEL" ]]; then
         echo "$JUJU_MODEL"
     else
-        timeout 0.5s bash -c 'juju switch 2> /dev/null || echo -' || echo '?'
+        controller="$(juju controllers --format=json | jq -r '.["current-controller"]')"
+        if [[ -z "$controller" ]]; then
+            echo "-:-"
+        else
+            model="$(juju controllers --format=json | jq -r ".controllers[\"$controller\"][\"current-model\"]" | sed -e 's:^.*/::')"
+            if [[ "$model" == "null" ]]; then
+                model="-"
+            #    machines="?"
+            #    units="?"
+            #else
+            #    status="$(timeout 0.5 juju models | grep '\*')"
+            #    if [[ -n "$status" ]]; then
+            #        machines="$(echo "$status" | awk '{print $5}')"
+            #        units="$(echo "$status" | awk '{print $6}')"
+            #    else
+            #        machines="?"
+            #        units="?"
+            #    fi
+            fi
+            echo "$controller:$model"
+        fi
     fi
 }
 
@@ -212,10 +253,11 @@ function jcs~() {
      esac
 }
 
+unset -f jdest
 function jdest() {
     if [[ $(juju version) == "2."* ]]; then
         controller=${1:-$(juju controllers --format=json | jq -r '."current-controller"')}
-        juju destroy-controller --destroy-all-models $controller
+        juju destroy-controller --destroy-storage --destroy-all-models $controller
     else
         jenv=${1-$(juju switch)}
         juju destroy-environment -y $jenv "$@"
