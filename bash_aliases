@@ -211,14 +211,11 @@ alias wkc='watch -tcn0.5 kubectl'
 
 function pyenv_ver() {
     version="$1"; shift
-    scope="shell"
     if [[ "$1" == "-g" ]]; then
-        scope="global"; shift
+        pyenv global "$version"; shift
     fi
     if [[ -n "$*" ]]; then
-        PYENV_VERSION="$version" pyenv exec "$@"
-    else
-        pyenv "$scope" "$version"
+        PYENV_VERSION="$version" "$@"
     fi
 }
 
