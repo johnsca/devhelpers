@@ -208,3 +208,45 @@ function maas-tunnel() {
 }
 
 alias wkc='watch -tcn0.5 kubectl'
+
+function pyenv_ver() {
+    version="$1"; shift
+    scope="shell"
+    if [[ "$1" == "-g" ]]; then
+        scope="global"; shift
+    fi
+    if [[ -n "$*" ]]; then
+        PYENV_VERSION="$version" pyenv exec "$@"
+    else
+        pyenv "$scope" "$version"
+    fi
+}
+
+for version in $(pyenv versions --bare); do
+    # shellcheck disable=SC2001
+    sv="$(echo "$version" | sed -e 's/^\([^.]*\)\.\([^.]*\)\..*$/\1\2/')"
+    unalias "pyenv$sv" 2> /dev/null
+    # shellcheck disable=SC2139,SC2140
+    alias "pyenv$sv"="pyenv_ver $version"
+done
+
+
+function itox() {
+    last_update=0
+    while true; do
+        echo -n "[$(date '+%H:%M:%S')] Waiting for activity..."
+        # vim makes a dumb 4913 file for every write
+        if ! tm=$(inotifywait -qr "$@" --exclude 4913 --exclude __pycache__ -e close_write --format '%T' --timefmt '%s'); then
+            # handle ctrl+c gracefully
+            break
+        fi
+        if [[ $tm -ge $last_update ]]; then
+            echo
+            echo -n "[$(date '+%H:%M:%S')] Waiting for activity to settle..."
+            sleep 3  # sleep to let file operations end
+            echo
+            last_update=$(date +%s)
+            tox
+        fi
+    done
+}
