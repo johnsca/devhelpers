@@ -45,7 +45,9 @@ unalias jbs 2> /dev/null
 unset -f jbs
 function jbs() {
     juju bootstrap \
+        --bootstrap-constraints "cores=2 mem=4GB" \
         --config test-mode=true \
+        --config mongo-memory-profile=low \
         --model-default resource-tags=owner=johnsca \
         --model-default test-mode=true \
         --model-default automatically-retry-hooks=false \
