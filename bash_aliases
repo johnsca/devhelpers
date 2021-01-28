@@ -233,17 +233,14 @@ function itox() {
     while true; do
         echo -n "[$(date '+%H:%M:%S')] Waiting for activity..."
         # vim makes a dumb 4913 file for every write
-        if ! tm=$(inotifywait -qr "$@" --exclude 4913 --exclude __pycache__ -e close_write --format '%T' --timefmt '%s'); then
-            # handle ctrl+c gracefully
-            break
-        fi
+        tm=$(inotifywait -qr . --exclude 4913 --exclude __pycache__ --exclude '.*\.egg-info' -e close_write --format '%T' --timefmt '%s')
         if [[ $tm -ge $last_update ]]; then
             echo
             echo -n "[$(date '+%H:%M:%S')] Waiting for activity to settle..."
             sleep 3  # sleep to let file operations end
             echo
             last_update=$(date +%s)
-            tox
+            tox "$@"
         fi
     done
 }
