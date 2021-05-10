@@ -20,6 +20,12 @@ function jpt() {
     fi
 }
 
+unalias jptt 2> /dev/null
+unset -f jptt
+function jptt() {
+    watch -tcn0.5 'juju status --color -m "$(juju models --format=json | jq -r '\''.models | map(.name) | map(select(contains("test-")))[0]'\'')" '"$*"
+}
+
 unalias jr-a 2> /dev/null
 unalias jr-s 2> /dev/null
 unset -f jr-a
@@ -38,21 +44,41 @@ alias ja-r='juju add-relation'
 alias jr-r='juju remove-relation'
 alias ja-u='juju add-unit'
 alias jr-u='juju remove-unit'
-alias jam='juju add-model --config test-mode=true --config automatically-retry-hooks=false --config logging-config="<root>=DEBUG"'
+alias jam='juju add-model --config default-series=focal --config resource-tags=owner=johnsca --config test-mode=true --config automatically-retry-hooks=false --config logging-config="<root>=DEBUG"'
 alias jscp='juju scp'
 
+#proxy_opts=" --model-default juju-http-proxy='http://squid.internal:3128' --model-default juju-https-proxy='http://squid.internal:3128' --model-default juju-no-proxy='localhost,127.0.0.1,0.0.0.0,ppa.launchpad.net,launchpad.net,10.0.8.0/24'"
 unalias jbs 2> /dev/null
 unset -f jbs
 function jbs() {
-    juju bootstrap \
-        --bootstrap-constraints "cores=2 mem=4GB" \
+    name="$1"; shift
+    if [[ -z "$1" || "$1" == --* ]]; then
+        cloud="$name"
+    else
+        cloud="$1"; shift
+    fi
+    case "$cloud" in
+        vsphere)
+            extra_opts="--model-default datastore=vsanDatastore --model-default primary-network=VLAN_2764 --config caas-image-repo=rocks.canonical.com/cdk/jujusolutions"
+            ;;
+        google)
+            extra_opts="--model-default container-networking-method=local --model-default fan-config="
+            ;;
+        *)
+            extra_opts=""
+            ;;
+    esac
+    #--model-default image-stream=daily \
+    juju bootstrap "$cloud" "$name" \
+        --bootstrap-constraints "cores=2 mem=4G" \
         --config test-mode=true \
         --config mongo-memory-profile=low \
+        --model-default default-series=focal \
         --model-default resource-tags=owner=johnsca \
         --model-default test-mode=true \
         --model-default automatically-retry-hooks=false \
         --model-default logging-config="<root>=DEBUG" \
-        --model-default image-stream=daily \
+        $extra_opts \
         "$@"
 }
 
@@ -60,14 +86,14 @@ function _jdm() {
     juju show-model "$1" | grep -q 'cloud: localhost'
     lxd=$?
     juju destroy-model --destroy-storage -y "$1"
-    if (( $lxd )); then
+    if (( lxd )); then
         lxc profile delete juju-"$1"
     fi
 }
 
 unset -f jdm
 function jdm() {
-    if [[ "$@" == "" ]]; then
+    if [[ "$*" == "" ]]; then
         _jdm "$(juju models --format=json | jq -r '."current-model"')"
     else
         for model in "$@"; do
@@ -85,7 +111,7 @@ function _unit() {
         unit="$(juju status | grep '/.*error' | cut -f1 -d' ' | tr -d '*' | head -n1)"
     elif ! echo "$unit" | grep -q '[-/]'; then
         # application name specified; take first errored unit or first unit
-        units="$(juju status $unit | grep '/[0-9]')"
+        units="$(juju status "$unit" | grep '/[0-9]')"
         unit="$(echo "$units" | grep 'error')"
         if [[ -z "$unit" ]]; then
             unit="$(echo "$units" | head -n1)"
@@ -97,17 +123,22 @@ function _unit() {
 
 unset -f _filter
 function _filter() {
-    unit="$(_unit $1)"
+    unit="$(_unit "$1")"
     if [[ "$unit" == */* ]]; then
-        unit="$(echo unit-$unit | tr '/' '-')"
+        unit="$(echo "unit-$unit" | tr '/' '-')"
     fi
     if [[ -n "$unit" ]]; then
         echo -n "-i $unit"
     fi
 }
 
+unalias jssh 2> /dev/null
 unset -f jssh
-alias jssh='juju ssh'
+function jssh {
+    unit="$(resolve_leader "$1")"
+    shift
+    juju ssh "$unit" -o IdentitiesOnly=yes "$@"
+}
 
 unset -f jl
 function jl() {
@@ -151,18 +182,19 @@ function jd() {
     fi
     if [[ -e layer.yaml ]]; then
         if [[ -z "$charm" ]]; then
-            charm=$(yq read metadata.yaml name)
+            charm=$(yq e .name metadata.yaml)
         fi
         if [[ "$charm" != *: && -e "$CBD/$charm" ]]; then
             charm_path="./$(realpath --relative-to . "$CBD/$charm")"
             >&2 echo "Deploying from $charm_path"
+            name="$charm"
             charm="$charm_path"
         fi
     else
         >&2 echo "Deploying from ."
         charm=.
     fi
-    juju deploy "$charm" $name "$@"
+    juju deploy "$charm" "$name" "$@"
 }
 
 function ju() {
@@ -175,7 +207,7 @@ function ju() {
     charm="$1"
     shift
     if [[ -z "$charm" ]]; then
-        charm=$(yq read metadata.yaml name)
+        charm=$(yq e .name metadata.yaml)
     fi
     if [[ -e "$CBD/$charm" ]]; then
         charm_path="./$(realpath --relative-to . "$CBD/$charm")"
@@ -184,7 +216,16 @@ function ju() {
         >&2 echo "Unable to determine path for $charm"
         return
     fi
-    juju upgrade-charm --force-units "$charm" --path "$charm_path" "$@"
+    errored_units="$(juju status --format=json | jq -r '.applications["'"$charm"'"].units | to_entries | map(select(.value["workload-status"].current == "error")) | map(.key) | .[]')"
+    if [[ -n "$errored_units" ]]; then
+        juju upgrade-charm --force-units "$charm" --path "$charm_path" "$@"
+        for unit in $errored_units; do
+            echo "Retrying hook on $unit"
+            juju resolved "$unit"
+        done
+    else
+        juju upgrade-charm "$charm" --path "$charm_path" "$@"
+    fi
 }
 
 function js() {
@@ -244,46 +285,40 @@ function juju-current-model {
 }
 
 
-unset -f jcs~
-function jcs~() {
-    jcs "$1"
-    case "$2" in
-        -i) cd $JR/interfaces;;
-        -b) cd $JR/bundles;;
-        -l) cd $JR/layers;;
-         *) cd $JR/charms;;
+unset -f jcd
+function jcd() {
+    case "$1" in
+        -i) cd "$JR"/interfaces || return; shift;;
+        -b) cd "$JR"/bundles || return; shift;;
+        -l) cd "$JR"/layers || return; shift;;
+        -o) cd "$JR"/overlays || return; shift;;
+        -c) cd "$JR"/charms || return; shift;;
+         *) cd "$JR"/charms || return;;
      esac
+     cd "$1" || return
 }
 
 unset -f jdest
 function jdest() {
     if [[ $(juju version) == "2."* ]]; then
         controller=${1:-$(juju controllers --format=json | jq -r '."current-controller"')}
-        juju destroy-controller --destroy-storage --destroy-all-models $controller
+        juju destroy-controller --destroy-storage --destroy-all-models "$controller"
     else
         jenv=${1-$(juju switch)}
-        juju destroy-environment -y $jenv "$@"
+        juju destroy-environment -y "$jenv" "$@"
         ~/.devhelpers/juju-machine-count > ~/.juju/.machine-count &
     fi
 }
 
 function render-bundle() {
     bundle="${1:-bundle.yaml}"
-    output="${2:-`echo $bundle | sed -e 's/.yaml$/.png/'`}"
-    curl -d "$(cat $bundle)" http://svg.juju.solutions/?output=png > $output
+    output="${2:-${bundle//.yaml/.png/}}"
+    curl -d "$(cat "$bundle")" http://svg.juju.solutions/?output=png > "$output"
 }
 
 unset -f jdo
 function jdo {
-    if [[ $(juju version) == "2."* ]]; then
-        juju run-action --wait "$@"
-    else
-        action_id=`set -o pipefail; juju action do "$@" | cut -f2 -d:`
-        if [[ $? == 0 ]]; then
-            echo "Action ID: $action_id"
-            juju action fetch --wait 0 $action_id
-        fi
-    fi
+    juju run-action --wait "$@"
 }
 
 function jrun {
@@ -305,16 +340,34 @@ alias juju-secret='grep admin-secret ~/.juju/environments/`juju switch`.jenv | s
 
 function pull-src {
     output=$(charm pull-source "$@")
-    echo $output
-    cd $(echo $output | cut -d' ' -f4)
-    if git remote -v | egrep -q 'github.com/juju(-solutions)?'; then
-        git remote set-url origin $(git remote -v | head -n1 | awk '{print $2}' | sed -e 's=https://github.com/=git@github.com:=')
+    echo "$output"
+    cd "$(echo "$output" | cut -d' ' -f4)" || return
+    if git remote -v | grep -Eq 'github.com/juju(-solutions)?'; then
+        git remote set-url origin "$(git remote -v | head -n1 | awk '{print $2}' | sed -e 's=https://github.com/=git@github.com:=')"
     fi
 }
 
 # compare two charm store revisions to see if they're the same entity
 function comp-rev {
-    if [[ `charm show $1 hash` == `charm show $2 hash` ]]; then
+    if [[ "$(charm show "$1" hash)" == "$(charm show "$2" hash)" ]]; then
         echo Match
     fi
+}
+
+unset -f resolve_leader
+function resolve_leader {
+    unit="$1"
+    if [[ "$unit" != */* || "$unit" == *"/leader" ]]; then
+        app="${unit%/leader}"
+        unit="$(juju status --format=json | jq -r '.applications["'"$app"'"].units | to_entries | map(select(.value.leader)) | map(.key) | .[]')"
+    fi
+    echo "$unit"
+}
+
+unset -f jdh
+function jdh {
+    unit="$(resolve_leader "$1")"
+    shift
+    juju ssh "$unit" 'echo "export TERM=xterm-256color; stty sane; reset" | sudo tee -a /root/.bashrc >> ~/.bashrc'
+    juju debug-hooks "$unit" "$@"
 }

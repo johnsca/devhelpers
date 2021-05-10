@@ -331,8 +331,30 @@ checkout() {
     fi
 
     exists_locally=$(git rev-parse --verify -q $new)
+    if [[ -z "$exists_locally" && "$new" == "master" ]]; then
+        exists_locally=$(git rev-parse --verify -q main)
+        if [[ -n "$exists_locally" ]]; then
+            new="main"
+        fi
+    elif [[ -z "$exists_locally" && "$new" == "main" ]]; then
+        exists_locally=$(git rev-parse --verify -q master)
+        if [[ -n "$exists_locally" ]]; then
+            new="master"
+        fi
+    fi
     if [[ -z "$remote_origin" ]]; then
         exists_remotely=$(git rev-parse --symbolic --remotes=*/$new | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
+        if [[ -z "$exists_remotely" && "$new" == "master" ]]; then
+            exists_remotely=$(git rev-parse --symbolic --remotes=*/main | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
+            if [[ -n "$exists_remotely" ]]; then
+                new="main"
+            fi
+        elif [[ -z "$exists_remotely" && "$new" == "main" ]]; then
+            exists_remotely=$(git rev-parse --symbolic --remotes=*/master | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
+            if [[ -n "$exists_remotely" ]]; then
+                new="master"
+            fi
+        fi
         if [[ -z "$exists_remotely" ]]; then
             remote_origin=$(git remote | grep origin | head -1)
             if [[ -z "$remote_origin" ]]; then
@@ -343,6 +365,17 @@ checkout() {
         fi
     else
         exists_remotely=$(git rev-parse --symbolic --remotes=$remote_origin/$new | sed -e 's:^refs/remotes/\([^/]*\).*:\1:')
+        if [[ -z "$exists_remotely" && "$new" == "master" ]]; then
+            exists_remotely=$(git rev-parse --symbolic --remotes=$remote_origin/main | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
+            if [[ -n "$exists_remotely" ]]; then
+                new="main"
+            fi
+        elif [[ -z "$exists_remotely" && "$new" == "main" ]]; then
+            exists_remotely=$(git rev-parse --symbolic --remotes=$remote_origin/master | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
+            if [[ -n "$exists_remotely" ]]; then
+                new="master"
+            fi
+        fi
     fi
 
     if [[ -n $exists_locally ]]; then
