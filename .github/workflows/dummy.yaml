@@ -1,0 +1,10 @@
+name: Test Suite
+on: [push]
+
+jobs:
+  lint:
+    name: Fake Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Pass
+      run: true
