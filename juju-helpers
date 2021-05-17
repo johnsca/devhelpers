@@ -23,7 +23,7 @@ function jpt() {
 unalias jptt 2> /dev/null
 unset -f jptt
 function jptt() {
-    watch -tcn0.5 'juju status --color -m "$(juju models --format=json | jq -r '\''.models | map(.name) | map(select(contains("test-")))[0]'\'')" '"$*"
+    watch -tcn0.5 'juju status --color -m "$(juju models --format=json | jq -r '\''.models | map(.name) | map(select(contains("test-") or contains("zaza-")))[0]'\'')" '"$*"
 }
 
 unalias jr-a 2> /dev/null
