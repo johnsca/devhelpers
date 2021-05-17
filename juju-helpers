@@ -255,6 +255,8 @@ function jcs() {
     export COD="$CHARM_OVERLAYS_DIR"
     export CHARM_BUNDLES_DIR="$JR/bundles"
     export CBND="$CHARM_BUNDLES_DIR"
+    export CHARM_RESOURCES_DIR="$JR/resources"
+    export CRD="$CHARM_RESOURCES_DIR"
 }
 
 
