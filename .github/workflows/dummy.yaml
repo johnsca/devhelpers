@@ -11,5 +11,6 @@ jobs:
       run: true
     - name: Labels
       env:
-        labels: ${{ github.event.pull_request.labels }}
-      run: echo "Labels: $labels"
+        LABELS: ${{ github.event.pull_request.labels }}
+      run: |
+        echo "Labels: $LABELS"
