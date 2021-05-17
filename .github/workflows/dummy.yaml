@@ -5,6 +5,8 @@ on:
 
 jobs:
   event-info:
+    name: Event Info
+    runs-on: ubuntu-latest
     steps:
       - name: Event Info
         env:
