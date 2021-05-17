@@ -11,6 +11,6 @@ jobs:
       run: true
     - name: Labels
       env:
-        LABELS: ${{ github.event.pull_request.labels }}
+        LABELS: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
       run: |
         echo "Labels: $LABELS"
