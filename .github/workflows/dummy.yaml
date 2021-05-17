@@ -1,7 +1,7 @@
 name: Test Workflow
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   event-info:
@@ -14,13 +14,10 @@ jobs:
         run: |
           echo "Event: $EVENT"
   test-job:
-    if: contains(github.event.pull_request.labels.*.name, 'test-label')
+    if: ${{ (github.event.action == 'labeled' && github.event.label.name == 'test-label') || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'test-label')) }}
     name: Test Job
     runs-on: ubuntu-latest
     steps:
-      - name: Conditional
-        if: contains(github.event.pull_request.labels.*.name, 'test-label')
-        run: true
       - name: Labels
         env:
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
