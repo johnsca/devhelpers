@@ -1,10 +1,26 @@
-name: Test Suite
-on: [push]
+name: Test Workflow
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
-  lint:
-    name: Fake Test
+  event-info:
+    if: ${{ (github.event.action == 'labeled' && github.event.label.name == 'test-label') || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'test-label')) }}
+    name: Event Info
     runs-on: ubuntu-latest
     steps:
-    - name: Pass
-      run: true
+      - name: Event Info
+        env:
+          EVENT: ${{ toJSON(github.event) }}
+        run: |
+          echo "Event: $EVENT"
+  test-job:
+    if: ${{ (github.event.action == 'labeled' && github.event.label.name == 'test-label') || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'test-label')) }}
+    name: Test Job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Labels
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
+        run: |
+          echo "Labels: $LABELS"
