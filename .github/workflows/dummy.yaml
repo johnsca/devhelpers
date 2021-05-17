@@ -5,6 +5,7 @@ on:
 
 jobs:
   test-job:
+    if: contains(github.event.pull_request.labels.*.name, 'test-label')
     name: Test Job
     runs-on: ubuntu-latest
     steps:
