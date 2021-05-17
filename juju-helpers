@@ -44,8 +44,10 @@ alias ja-r='juju add-relation'
 alias jr-r='juju remove-relation'
 alias ja-u='juju add-unit'
 alias jr-u='juju remove-unit'
-alias jam='juju add-model --config default-series=focal --config resource-tags=owner=johnsca --config test-mode=true --config automatically-retry-hooks=false --config logging-config="<root>=DEBUG"'
+alias jam='juju add-model --config default-series=focal --config resource-tags=owner=johnsca --config test-mode=true --config automatically-retry-hooks=false --config logging-config="<root>=DEBUG; unit=DEBUG" --config update-status-hook-interval="1m"'
 alias jscp='juju scp'
+alias jproxy='juju model-config juju-http-proxy=http://squid.internal:3128 juju-https-proxy=http://squid.internal:3128 juju-no-proxy="localhost,127.0.0.1,0.0.0.0,ppa.launchpad.net,launchpad.net,10.0.8.0/24"'
+
 
 #proxy_opts=" --model-default juju-http-proxy='http://squid.internal:3128' --model-default juju-https-proxy='http://squid.internal:3128' --model-default juju-no-proxy='localhost,127.0.0.1,0.0.0.0,ppa.launchpad.net,launchpad.net,10.0.8.0/24'"
 unalias jbs 2> /dev/null
@@ -77,7 +79,8 @@ function jbs() {
         --model-default resource-tags=owner=johnsca \
         --model-default test-mode=true \
         --model-default automatically-retry-hooks=false \
-        --model-default logging-config="<root>=DEBUG" \
+        --model-default logging-config="<root>=DEBUG; unit=DEBUG" \
+        --model-default update-status-hook-interval="1m" \
         $extra_opts \
         "$@"
 }
