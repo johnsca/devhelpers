@@ -10,9 +10,9 @@ jobs:
     steps:
       - name: Event Info
         env:
-          PR: ${{ toJSON(github.event.pull_request) }}
+          EVENT: ${{ toJSON(github.event) }}
         run: |
-          echo "Event: $PR"
+          echo "Event: $EVENT"
   test-job:
     if: contains(github.event.pull_request.labels.*.name, 'test-label')
     name: Test Job
