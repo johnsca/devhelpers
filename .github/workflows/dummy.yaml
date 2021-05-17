@@ -8,6 +8,8 @@ jobs:
     steps:
     - name: Conditional
       if: contains(github.event.pull_request.labels.*.name, 'test-label')
-      run: echo "Has label"
-    - name: Pass
       run: true
+    - name: Labels
+      env:
+        labels: ${{ github.event.pull_request.labels }}
+      run: echo "Labels: $labels"
