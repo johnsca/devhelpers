@@ -5,6 +5,7 @@ on:
 
 jobs:
   event-info:
+    if: ${{ (github.event.action == 'labeled' && github.event.label.name == 'test-label') || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'test-label')) }}
     name: Event Info
     runs-on: ubuntu-latest
     steps:
