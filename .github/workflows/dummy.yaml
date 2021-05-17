@@ -1,10 +1,13 @@
-name: Test Suite
-on: [push]
+name: Test Workflow
+on: [pull_request]
 
 jobs:
-  lint:
-    name: Fake Test
+  test-job:
+    name: Test Job
     runs-on: ubuntu-latest
     steps:
+    - name: Conditional
+      if: contains(github.event.pull_request.labels.*.name, 'test-label')
+      run: echo "Has label"
     - name: Pass
       run: true
