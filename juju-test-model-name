@@ -1,0 +1,8 @@
+#!/bin/bash
+
+controller="$1"
+if [[ -z "$controller" ]]; then
+    controller="$(juju list-controllers --format=json | jq -r '."current-controller"')"
+fi
+model="$(juju models -c "$controller" --format=json | jq -r '.models | map(.name) | map(select(contains("test-") or contains("zaza-")))[0]')"
+echo "$controller:$model"

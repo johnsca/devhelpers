@@ -23,7 +23,7 @@ function jpt() {
 unalias jptt 2> /dev/null
 unset -f jptt
 function jptt() {
-    watch -tcn0.5 'juju status --color -m "$(juju models --format=json | jq -r '\''.models | map(.name) | map(select(contains("test-") or contains("zaza-")))[0]'\'')" '"$*"
+    watch -cn0.5 'juju status --color -m $(juju-test-model-name $1)'
 }
 
 unalias jr-a 2> /dev/null
@@ -38,6 +38,9 @@ function jr-a() {
 }
 alias jr-s='jr-a'
 
+_PROXY=http://squid.internal:3128
+_NO_PROXY="localhost,127.0.0.1,0.0.0.0,ppa.launchpad.net,launchpad.net,10.246.156.0/24,10.152.183.0/24,10.1.0.0/16"
+
 alias dhx='juju dhx'
 alias jr-m='juju remove-machine'
 alias ja-r='juju add-relation'
@@ -46,13 +49,17 @@ alias ja-u='juju add-unit'
 alias jr-u='juju remove-unit'
 alias jam='juju add-model --config default-series=focal --config resource-tags=owner=johnsca --config test-mode=true --config automatically-retry-hooks=false --config logging-config="<root>=DEBUG; unit=DEBUG" --config update-status-hook-interval="1m"'
 alias jscp='juju scp'
-alias jproxy='juju model-config juju-http-proxy=http://squid.internal:3128 juju-https-proxy=http://squid.internal:3128 juju-no-proxy="localhost,127.0.0.1,0.0.0.0,ppa.launchpad.net,launchpad.net,10.0.8.0/24"'
+# shellcheck disable=SC2139
+alias jproxy="juju model-config juju-http-proxy='$_PROXY' juju-https-proxy='$_PROXY' juju-no-proxy='$_NO_PROXY'"
 
+unset -f jproxyd
+function jproxyd() {
+    juju model-defaults "$1" juju-http-proxy="$_PROXY" juju-https-proxy="$_PROXY" juju-no-proxy="$_NO_PROXY"
+}
 
-#proxy_opts=" --model-default juju-http-proxy='http://squid.internal:3128' --model-default juju-https-proxy='http://squid.internal:3128' --model-default juju-no-proxy='localhost,127.0.0.1,0.0.0.0,ppa.launchpad.net,launchpad.net,10.0.8.0/24'"
-unalias jbs 2> /dev/null
 unset -f jbs
 function jbs() {
+    proxy_opts="--model-default juju-http-proxy='$_PROXY' --model-default juju-https-proxy='$_PROXY' --model-default juju-no-proxy='$_NO_PROXY'"
     name="$1"; shift
     if [[ -z "$1" || "$1" == --* ]]; then
         cloud="$name"
@@ -61,7 +68,7 @@ function jbs() {
     fi
     case "$cloud" in
         vsphere)
-            extra_opts="--model-default datastore=vsanDatastore --model-default primary-network=VLAN_2764 --config caas-image-repo=rocks.canonical.com/cdk/jujusolutions"
+            extra_opts="--model-default datastore=vsanDatastore --model-default primary-network=VLAN_2766 $proxy_opts" # --config caas-image-repo=rocks.canonical.com/cdk/jujusolutions"
             ;;
         google)
             extra_opts="--model-default container-networking-method=local --model-default fan-config="
@@ -70,9 +77,14 @@ function jbs() {
             extra_opts=""
             ;;
     esac
+    cloud_type="$(juju show-cloud --client "$cloud" | yq e '.type' -)"
+    bootstrap_constraints="cores=2 mem=4G"
+    if [[ "$cloud_type" == "k8s" ]]; then
+        bootstrap_constraints=""
+    fi
     #--model-default image-stream=daily \
     juju bootstrap "$cloud" "$name" \
-        --bootstrap-constraints "cores=2 mem=4G" \
+        --bootstrap-constraints "$bootstrap_constraints" \
         --config test-mode=true \
         --config mongo-memory-profile=low \
         --model-default default-series=focal \
@@ -293,14 +305,14 @@ function juju-current-model {
 unset -f jcd
 function jcd() {
     case "$1" in
-        -i) cd "$JR"/interfaces || return; shift;;
-        -b) cd "$JR"/bundles || return; shift;;
-        -l) cd "$JR"/layers || return; shift;;
-        -o) cd "$JR"/overlays || return; shift;;
-        -c) cd "$JR"/charms || return; shift;;
-         *) cd "$JR"/charms || return;;
+        -i) prefix="$JR"/interfaces; shift;;
+        -b) prefix="$JR"/bundles; shift;;
+        -l) prefix="$JR"/layers; shift;;
+        -o) prefix="$JR"/overlays; shift;;
+        -c) prefix="$JR"/charms; shift;;
+         *) prefix="$JR"/charms;;
      esac
-     cd "$1" || return
+     cd "$prefix/$1" || return
 }
 
 unset -f jdest
