@@ -1,0 +1,19 @@
+#!/bin/bash
+
+function pyenv_ver() {
+    version="$1"; shift
+    if [[ "$1" == "-g" ]]; then
+        pyenv global "$version"; shift
+    fi
+    if [[ -n "$*" ]]; then
+        PYENV_VERSION="$version" "$@"
+    fi
+}
+
+for version in $(pyenv versions --bare); do
+    # shellcheck disable=SC2001
+    sv="$(echo "$version" | sed -e 's/^\([^.]*\)\.\([^.]*\)\..*$/\1\2/')"
+    unalias "pyenv$sv" 2> /dev/null
+    # shellcheck disable=SC2139,SC2140
+    alias "pyenv$sv"="pyenv_ver $version"
+done
