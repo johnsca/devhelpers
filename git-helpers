@@ -3,26 +3,26 @@
 # reset everything we define here
 # so that we pick up any changes
 # when re-sourced
-unset -f git_branch
-unset -f git_branch_p
-unset -f ci
-unset -f cm
-unset -f show-push
-unset -f bdiff
-unset -f bdiv
-unset -f glog
-unset -f changelog
-unset -f print_changelog
-unset -f shortlog
-unset -f checkout
-unset -f branch
-unset -f utags
-unset -f update
-unset -f story
-unset -f _git_branches_both
-unset -f copy_all_branches
-unset -f git_color
-unset -f gdiff
+unset -f git_branch 2> /dev/null
+unset -f git_branch_p 2> /dev/null
+unset -f ci 2> /dev/null
+unset -f cm 2> /dev/null
+unset -f show-push 2> /dev/null
+unset -f bdiff 2> /dev/null
+unset -f bdiv 2> /dev/null
+unset -f _glog 2> /dev/null
+unset -f changelog 2> /dev/null
+unset -f print_changelog 2> /dev/null
+unset -f shortlog 2> /dev/null
+unset -f checkout 2> /dev/null
+unset -f branch 2> /dev/null
+unset -f utags 2> /dev/null
+unset -f update 2> /dev/null
+unset -f story 2> /dev/null
+unset -f _git_branches_both 2> /dev/null
+unset -f copy_all_branches 2> /dev/null
+unset -f git_color 2> /dev/null
+unset -f gdiff 2> /dev/null
 unalias branches 2> /dev/null
 unalias push 2> /dev/null
 unalias pull 2> /dev/null
@@ -34,6 +34,7 @@ unalias unpushed 2> /dev/null
 unalias gl 2> /dev/null
 unalias glt 2> /dev/null
 unalias gll 2> /dev/null
+unalias grev 2> /dev/null
 
 USE_CTAGS="true"
 TAB_COMPLETE_REMOTE_BRANCHES="true"
@@ -58,12 +59,20 @@ git_branch_p() {
         fi
 }
 
+git_default_branch() {
+    git config repo.defaultbranch | git config init.defaultbranch
+}
+
+alias gitmain='branch=$(git_branch); checkout $(git_default_branch) && pull -p && [ "$branch" != "$(git_default_branch)" ] && branch -d $branch ; unset branch'
+
+
 # List all branches, local and remote
 SED_EX=r
 if [[ `echo 'foo' | sed -Ee 's/foo/bar/' 2> /dev/null` ]]; then
     SED_EX=E
 fi
-alias branches='git branch -a | sed -'$SED_EX'e "s:^\*? *::" | sed -'$SED_EX'e "s:^(remotes/[^/]+)?/::g" | grep -v "HEAD -> origin/master" | sort | uniq'
+alias branches='git branch -a | sed -'$SED_EX'e "s:^\*? *::" | sed -'$SED_EX'e "s:^(remotes/[^/]+)?/::g" | grep -v "HEAD -> origin/(master|main)" | sort | uniq'
+alias mybranches='git branch -a | sed -'$SED_EX'e "s:^\*? *::" | sed -'$SED_EX'e "s:^(remotes/[^/]+)?/::g" | grep -v "HEAD -> origin/(master|main)" | grep johnsca | sort | uniq'
 
 alias push='git push'
 alias pull='git pull'
@@ -71,10 +80,16 @@ alias add='git add'
 alias merge='git merge'
 #alias unpushed='git branch -vv | grep ahead'
 alias unpushed='git log --branches --not --remotes --simplify-by-decoration --decorate --oneline'
-alias gl='glog -10 --show-tags'
-alias gll='git log --graph --decorate --pretty=oneline --abbrev-commit'
+alias gl='_glog --show-tags -n10'
+alias gll='_glog --show-tags'
+alias gla='git log --graph --decorate --pretty=oneline --abbrev-commit'
+alias grev='git rev-parse HEAD'
 
-DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "$SHELL" == "/bin/zsh" ]]; then
+    DEVHELPERS_DIR="$(cd "$(dirname "${(%):-%N}")" && pwd)"
+else
+    DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 DHP=$DEVHELPERS_DIR/helpers.py
 
 gdiff() {
@@ -127,16 +142,14 @@ show-pull() {
 # With one argument, defaults to bdiff HEAD $1
 bdiff() {
     VERBOSE=""
-    MERGES="--no-merges"
     OPTS=""
     unset A
     unset B
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -m|--show-merges) MERGES="";;
             -v|--verbose) VERBOSE="true";;
             -vv|--very-verbose) VERBOSE="very";;
-            -*) OPTS="$OPTS $1";;
+            -*) OPTS="$OPTS$1 ";;
             *)
                 if [[ -z $A ]]; then
                     A=$1
@@ -161,10 +174,7 @@ bdiff() {
     elif [[ "$VERBOSE" == "very" ]]; then
         git log $MERGES --stat -p --date=short $OPTS $* $A ^$B
     else
-        if [[ "$MERGES" == "" ]]; then
-            MERGES="--show-merges"
-        fi
-        glog $MERGES $OPTS "$@" $A ^$B
+        _glog $OPTS "$@" $A ^$B
     fi
 }
 
@@ -207,21 +217,18 @@ bdiv() {
 }
 
 # Prettier version of git log --oneline
-glog() {
+_glog() {
     MERGES="--no-merges"
     TAGS=""
-    OPTS=""
-    while [[ $# -gt 0 && $1 == -* ]]; do
+    while [[ "$1" == "--show-merges" || "$1" == "--show-tags" ]]; do
         if [[ "$1" == "--show-merges" ]]; then
             MERGES=""
         elif [[ "$1" == "--show-tags" ]]; then
             TAGS=" %C(yellow)%d%Creset"
-        else
-            OPTS="$OPTS $1"
         fi
         shift
     done
-    git --no-pager log $MERGES --pretty=format:"%h : %ad : %an : %s $TAGS" --date=short $OPTS "$@" | perl -ne 'BEGIN { $max = 0; } @_ = split /:/, $_, 4; push @lines, [@_[0..3]]; $max = length($_[2]) if length($_[2]) > $max; END { printf "\e[0;33m%s\e[0m:%s:\e[1;34m%-${max}s\e[0m:%s", @$_ for @lines }' | less -RXF
+    git --no-pager log $MERGES --pretty=format:"%h : %ad : %an : %s$TAGS" --date=short "$@" | perl -ne 'BEGIN { $max = 0; } @_ = split /:/, $_, 4; push @lines, [@_[0..3]]; $max = length($_[2]) if length($_[2]) > $max; END { printf "\e[0;33m%s\e[0m:%s:\e[1;34m%-${max}s\e[0m:%s", @$_ for @lines }' | less -RXF
 }
 
 # Show the full changelog, marked by release tags, starting with HEAD
@@ -270,6 +277,10 @@ shortlog() {
         echo
 }
 
+bremote() {
+    git rev-parse --symbolic --remotes="$1" | sed -Ee 's:^(refs/(remotes|heads)/)?([^/]*)/.*:\3:' | sort | uniq
+}
+
 # Intelligent wrapper around git checkout.
 #
 # With this, you don't need to worry about whether you've checked
@@ -283,9 +294,10 @@ checkout() {
       FROM  If creating a new branch, what ref to create it from
             (e.g., master, HEAD, branch, tag) (defaults to master)
 "
+    default_branch="$($DHP base_branch)"
     new=
-    old=$($DHP base_branch)
-    cur=$(git_branch)
+    old="$default_branch"
+    cur="$(git_branch)"
     file=
     remote_origin=
 
@@ -298,19 +310,19 @@ checkout() {
         case $1 in
             -h) echo "$usage"; return;;
             -f) file=true;;
-            -o) shift; remote_origin=$1;;
+            -o) shift; remote_origin="$1";;
             *)
                 if [[ -z $new ]]; then
-                    new=$1
+                    new="$1"
                 else
-                    old=$1
+                    old="$1"
                 fi
                 ;;
         esac
         shift
     done
 
-    if [[ -z $new ]]; then
+    if [[ -z "$new" ]]; then
         echo "Missing required argument"
         echo "$usage"
         return 1
@@ -325,34 +337,22 @@ checkout() {
         echo -n "Confirm reset file? [y/N] "
         read confirm
         if [[ "$confirm" =~ [Yy] ]]; then
-            git checkout -f $new
+            git checkout -f "$new"
         fi
         return
     fi
 
-    exists_locally=$(git rev-parse --verify -q $new)
-    if [[ -z "$exists_locally" && "$new" == "master" ]]; then
-        exists_locally=$(git rev-parse --verify -q main)
-        if [[ -n "$exists_locally" ]]; then
-            new="main"
-        fi
-    elif [[ -z "$exists_locally" && "$new" == "main" ]]; then
-        exists_locally=$(git rev-parse --verify -q master)
-        if [[ -n "$exists_locally" ]]; then
-            new="master"
-        fi
+    exists_locally=$(git rev-parse --verify -q "$new")
+    if [[ -z "$exists_locally" && "$new" == "master" || "$new" == "main" ]]; then
+        new="$default_branch"
+        exists_locally=$(git rev-parse --verify -q "$new")
     fi
     if [[ -z "$remote_origin" ]]; then
-        exists_remotely=$(git rev-parse --symbolic --remotes=*/$new | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
-        if [[ -z "$exists_remotely" && "$new" == "master" ]]; then
-            exists_remotely=$(git rev-parse --symbolic --remotes=*/main | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
-            if [[ -n "$exists_remotely" ]]; then
-                new="main"
-            fi
-        elif [[ -z "$exists_remotely" && "$new" == "main" ]]; then
-            exists_remotely=$(git rev-parse --symbolic --remotes=*/master | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
-            if [[ -n "$exists_remotely" ]]; then
-                new="master"
+        exists_remotely=$(bremote "*/$new")
+        if [[ -z "$exists_remotely" && "$new" == "master" || "$new" == "$main" ]]; then
+            exists_remotely=$(bremote "*/$default_branch")
+            if [[ -n "$exists_remotely" && -z "$exists_locally" ]]; then
+                new="$default_branch"
             fi
         fi
         if [[ -z "$exists_remotely" ]]; then
@@ -364,16 +364,11 @@ checkout() {
             remote_origin="$exists_remotely"
         fi
     else
-        exists_remotely=$(git rev-parse --symbolic --remotes=$remote_origin/$new | sed -e 's:^refs/remotes/\([^/]*\).*:\1:')
-        if [[ -z "$exists_remotely" && "$new" == "master" ]]; then
-            exists_remotely=$(git rev-parse --symbolic --remotes=$remote_origin/main | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
-            if [[ -n "$exists_remotely" ]]; then
-                new="main"
-            fi
-        elif [[ -z "$exists_remotely" && "$new" == "main" ]]; then
-            exists_remotely=$(git rev-parse --symbolic --remotes=$remote_origin/master | sed -e 's:^\(refs/remotes/\)\?\([^/]*\).*:\2:')
-            if [[ -n "$exists_remotely" ]]; then
-                new="master"
+        exists_remotely=$(bremote "$remote_origin/$new")
+        if [[ -z "$exists_remotely" && "$new" == "master" || "$new" == "main" ]]; then
+            exists_remotely=$(bremote "$remote_origin/$default_branch")
+            if [[ -n "$exists_remotely"  && -z "$exists_locally" ]]; then
+                new="$default_branch"
             fi
         fi
     fi
@@ -386,7 +381,7 @@ checkout() {
             fi
         fi
     elif [[ -n $exists_remotely ]]; then
-        git checkout -b $new $remote_origin/$new
+        git checkout -b "$new" "$remote_origin/$new"
         if [ $? -gt 0 ]; then
             return $?
         fi
@@ -416,38 +411,41 @@ checkout() {
             return $?
         fi
     fi
-    utags
 }
 
 # Wrapper around git commit and git branch -D that DWYM
 # Supports -r for remote deleting of branches
 branch() {
-        remote=
-        delete=
-        branch=
-        for i in {1..9}; do
-                case ${!i} in
-                        -d) delete=true;;
-                        -r) remote=true;;
-                        *)
-                                if [[ -z $branch ]]; then
-                                        branch=${!i}
-                                fi
-                                ;;
-                esac
-        done
-        if [[ -z $delete ]]; then
-                checkout "$@"
-                return
-        fi
-        if [[ -z $branch ]]; then
-                echo "Missing branch name"
-                return
-        fi
-        git branch -D $branch
-        if [[ -n $remote ]]; then
-                git push origin :$branch
-        fi
+    remote=
+    delete=
+    branch=
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            -d)
+                delete=true
+                shift;;
+            -r)
+                remote=true
+                shift;;
+            *)
+                if [[ -z "$branch" ]]; then
+                    branch=$1
+                fi
+                shift;;
+        esac
+    done
+    if [[ -z "$branch" ]]; then
+        echo "Missing branch name"
+        return
+    fi
+    if [[ -z "$delete" ]]; then
+        checkout "$branch"
+        return
+    fi
+    git branch -D $branch
+    if [[ -n "$remote" ]]; then
+        git push origin :$branch
+    fi
 }
 
 alias st='git status'
@@ -493,22 +491,22 @@ update() {
     return $result
 }
 
-if [[ `type -t __gitcomp` ]]; then
-    _git_branches_both() {
-        __gitcomp "$(branches)"
-    }
-
-    commands="checkout update bdiff bdiv merge pre-merge"
-    if [[ "$TAB_COMPLETE_REMOTE_BRANCHES" == "true" ]]; then
-        for cmd in $commands; do
-            complete -o default -o nospace -F _git_branches_both $cmd
-        done
-    else
-        for cmd in $commands; do
-            complete -o default -o nospace -F _git_checkout $cmd
-        done
-    fi
-fi
+#if [[ `type -t __gitcomp` ]]; then
+#    _git_branches_both() {
+#        __gitcomp "$(branches)"
+#    }
+#
+#    commands="checkout update bdiff bdiv merge pre-merge"
+#    if [[ "$TAB_COMPLETE_REMOTE_BRANCHES" == "true" ]]; then
+#        for cmd in $commands; do
+#            complete -o default -o nospace -F _git_branches_both $cmd
+#        done
+#    else
+#        for cmd in $commands; do
+#            complete -o default -o nospace -F _git_checkout $cmd
+#        done
+#    fi
+#fi
 
 red(){
     printf "\033[1;31m$*\033[0m"

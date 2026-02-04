@@ -7,13 +7,18 @@ function pyenv_ver() {
     fi
     if [[ -n "$*" ]]; then
         PYENV_VERSION="$version" "$@"
+    else
+        export PYENV_VERSION="$version"
     fi
 }
 
 for version in $(pyenv versions --bare); do
     # shellcheck disable=SC2001
     sv="$(echo "$version" | sed -e 's/^\([^.]*\)\.\([^.]*\)\..*$/\1\2/')"
+    svd="$(echo "$version" | sed -e 's/^\([^.]*\)\.\([^.]*\)\..*$/\1.\2/')"
     unalias "pyenv$sv" 2> /dev/null
+    unalias "pyenv$svd" 2> /dev/null
     # shellcheck disable=SC2139,SC2140
     alias "pyenv$sv"="pyenv_ver $version"
+    alias "pyenv$svd"="pyenv_ver $version"
 done
