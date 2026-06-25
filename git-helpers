@@ -85,7 +85,7 @@ alias gll='_glog --show-tags'
 alias gla='git log --graph --decorate --pretty=oneline --abbrev-commit'
 alias grev='git rev-parse HEAD'
 
-if [[ "$SHELL" == "/bin/zsh" ]]; then
+if [ -n "$ZSH_VERSION" ]; then
     DEVHELPERS_DIR="$(cd "$(dirname "${(%):-%N}")" && pwd)"
 else
     DEVHELPERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
